@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Balance Reconciler</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #f4f6f9;
+      color: #1a1a2e;
+      min-height: 100vh;
+      padding: 40px 24px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 32px;
+      text-align: center;
+      letter-spacing: -0.3px;
+    }
+
+    .drop-row {
+      display: flex;
+      gap: 16px;
+      max-width: 800px;
+      margin: 0 auto 32px;
+    }
+
+    .drop-zone {
+      flex: 1;
+      border: 2px dashed #b0b8c9;
+      border-radius: 12px;
+      padding: 32px 16px;
+      text-align: center;
+      cursor: pointer;
+      background: #fff;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+    }
+
+    .drop-zone.over {
+      border-color: #4f8ef7;
+      background: #eef3ff;
+    }
+
+    .drop-zone.loaded {
+      border-color: #34c759;
+      background: #f0faf3;
+    }
+
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .drop-icon { font-size: 2rem; margin-bottom: 8px; }
+
+    .drop-label {
+      font-weight: 600;
+      font-size: 0.95rem;
+      margin-bottom: 4px;
+    }
+
+    .drop-hint {
+      font-size: 0.8rem;
+      color: #6b7280;
+    }
+
+    .drop-filename {
+      margin-top: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #34c759;
+      min-height: 1.2em;
+    }
+
+    .run-btn {
+      display: block;
+      margin: 0 auto 40px;
+      padding: 12px 36px;
+      background: #4f8ef7;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+    }
+
+    .run-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .run-btn:not(:disabled):hover { background: #3a78e0; }
+
+    #report { max-width: 800px; margin: 0 auto; }
+
+    .summary {
+      text-align: center;
+      font-size: 1.1rem;
+      font-weight: 700;
+      padding: 14px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+
+    .summary.ok { background: #d1fae5; color: #065f46; }
+    .summary.fail { background: #fee2e2; color: #991b1b; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+    }
+
+    thead tr { background: #1a1a2e; color: #fff; }
+    th, td { padding: 12px 16px; text-align: right; font-size: 0.9rem; }
+    th:first-child, td:first-child { text-align: left; }
+
+    tbody tr.match { background: #d1fae5; color: #065f46; }
+    tbody tr.mismatch { background: #fee2e2; color: #991b1b; }
+    tbody tr.no-bank { background: #fef9c3; color: #713f12; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 99px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .badge.ok { background: #34c759; color: #fff; }
+    .badge.mismatch { background: #ff3b30; color: #fff; }
+    .badge.no-bank { background: #f59e0b; color: #fff; }
+
+    .error-msg {
+      text-align: center;
+      color: #991b1b;
+      background: #fee2e2;
+      border-radius: 10px;
+      padding: 14px;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Balance Reconciler</h1>
+
+<div class="drop-row">
+  <div class="drop-zone" id="zone-tx">
+    <input type="file" accept=".csv" id="file-tx" />
+    <div class="drop-icon">📄</div>
+    <div class="drop-label">Transactions CSV</div>
+    <div class="drop-hint">Drop file or click to browse</div>
+    <div class="drop-filename" id="name-tx"></div>
+  </div>
+
+  <div class="drop-zone" id="zone-bank">
+    <input type="file" accept=".csv" id="file-bank" />
+    <div class="drop-icon">🏦</div>
+    <div class="drop-label">Bank Balances CSV</div>
+    <div class="drop-hint">Drop file or click to browse</div>
+    <div class="drop-filename" id="name-bank"></div>
+  </div>
+</div>
+
+<button class="run-btn" id="run-btn" disabled>Reconcile</button>
+
+<div id="report"></div>
+
+<script>
+  const files = { tx: null, bank: null };
+
+  function setupZone(zoneId, fileId, nameId, key) {
+    const zone = document.getElementById(zoneId);
+    const input = document.getElementById(fileId);
+    const nameEl = document.getElementById(nameId);
+
+    function loadFile(file) {
+      if (!file) return;
+      files[key] = file;
+      nameEl.textContent = file.name;
+      zone.classList.add('loaded');
+      checkReady();
+    }
+
+    input.addEventListener('change', () => loadFile(input.files[0]));
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('over'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('over');
+      loadFile(e.dataTransfer.files[0]);
+    });
+  }
+
+  function checkReady() {
+    document.getElementById('run-btn').disabled = !(files.tx && files.bank);
+  }
+
+  async function reconcile() {
+    const btn = document.getElementById('run-btn');
+    btn.disabled = true;
+    btn.textContent = 'Running...';
+
+    const form = new FormData();
+    form.append('transactions', files.tx);
+    form.append('bank_balances', files.bank);
+
+    try {
+      const res = await fetch('/reconcile', { method: 'POST', body: form });
+      const data = await res.json();
+
+      if (data.error) {
+        document.getElementById('report').innerHTML =
+          `<div class="error-msg">${data.error}</div>`;
+        return;
+      }
+
+      render(data);
+    } catch (e) {
+      document.getElementById('report').innerHTML =
+        `<div class="error-msg">Could not reach server: ${e.message}</div>`;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Reconcile';
+    }
+  }
+
+  function fmt(n) {
+    return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function render(data) {
+    const summaryClass = data.all_match ? 'ok' : 'fail';
+    const summaryText = data.all_match
+      ? 'All dates reconcile.'
+      : 'Discrepancies found — see highlighted rows.';
+
+    const tableRows = data.rows.map(r => {
+      if (r.status === 'NO_RECORD') {
+        return `<tr class="no-bank">
+          <td>${r.date}</td>
+          <td>$${fmt(r.running)}</td>
+          <td>—</td>
+          <td><span class="badge no-bank">NO RECORD</span></td>
+        </tr>`;
+      }
+      const cls = r.status === 'OK' ? 'match' : 'mismatch';
+      const badge = r.status === 'OK'
+        ? '<span class="badge ok">OK</span>'
+        : '<span class="badge mismatch">MISMATCH</span>';
+      return `<tr class="${cls}">
+        <td>${r.date}</td>
+        <td>$${fmt(r.running)}</td>
+        <td>$${fmt(r.bank)}</td>
+        <td>${badge}</td>
+      </tr>`;
+    }).join('');
+
+    document.getElementById('report').innerHTML = `
+      <div class="summary ${summaryClass}">${summaryText}</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Running Balance</th>
+            <th>Bank Balance</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    `;
+  }
+
+  setupZone('zone-tx', 'file-tx', 'name-tx', 'tx');
+  setupZone('zone-bank', 'file-bank', 'name-bank', 'bank');
+  document.getElementById('run-btn').addEventListener('click', reconcile);
+</script>
+</body>
+</html>

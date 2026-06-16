@@ -1,0 +1,7 @@
+{
+  "all_match": false,
+  "rows": [
+    {"date": "2025-01-01", "running": 500.0, "bank": 500.0, "status": "OK"},
+    {"date": "2025-01-02", "running": 400.0, "bank": 450.0, "status": "MISMATCH"}
+  ]
+}
