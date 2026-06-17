@@ -1,0 +1,17 @@
+{
+  "all_match": false,
+  "mismatch_count": 1,
+  "rows": [
+    {"date": "2025-01-01", "running": 500.0, "bank": 500.0, "status": "OK", "discrepancy": 0.0},
+    {"date": "2025-01-02", "running": 400.0, "bank": 350.0, "status": "MISMATCH", "discrepancy": 50.0},
+    {"date": "2025-01-03", "running": 600.0, "bank": 550.0, "status": "DIVERGE", "discrepancy": 50.0}
+  ],
+  "summary": {
+    "final_running_balance": 600.0,
+    "final_bank_balance": 550.0,
+    "net_discrepancy": 50.0,
+    "gaps": [
+      {"id": 1, "started": "2025-01-02", "resolved": null, "amount": 50.0}
+    ]
+  }
+}

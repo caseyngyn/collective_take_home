@@ -1,0 +1,136 @@
+{
+  "rows": [
+    {
+      "date": "2025-01-01",
+      "running": 10000.0,
+      "bank": 10000.0,
+      "status": "OK",
+      "discrepancy": 0.0
+    },
+    {
+      "date": "2025-01-02",
+      "running": 9500.0,
+      "bank": 9500.0,
+      "status": "OK",
+      "discrepancy": 0.0
+    },
+    {
+      "date": "2025-01-03",
+      "running": 8300.0,
+      "bank": 8300.0,
+      "status": "OK",
+      "discrepancy": 0.0
+    },
+    {
+      "date": "2025-01-04",
+      "running": 10300.0,
+      "bank": 10200.0,
+      "status": "MISMATCH",
+      "discrepancy": 100.0
+    },
+    {
+      "date": "2025-01-05",
+      "running": 10000.0,
+      "bank": 9900.0,
+      "status": "DIVERGE",
+      "discrepancy": 100.0
+    },
+    {
+      "date": "2025-01-06",
+      "running": 9850.0,
+      "bank": 9850.0,
+      "status": "OK",
+      "discrepancy": 0.0
+    },
+    {
+      "date": "2025-01-07",
+      "running": 14850.0,
+      "bank": 14850.0,
+      "status": "OK",
+      "discrepancy": 0.0
+    },
+    {
+      "date": "2025-01-08",
+      "running": 14050.0,
+      "bank": 14050.0,
+      "status": "OK",
+      "discrepancy": 0.0
+    },
+    {
+      "date": "2025-01-09",
+      "running": 13800.0,
+      "bank": null,
+      "status": "NO_RECORD",
+      "discrepancy": null
+    },
+    {
+      "date": "2025-01-10",
+      "running": 15300.0,
+      "bank": 15200.0,
+      "status": "MISMATCH",
+      "discrepancy": 100.0
+    },
+    {
+      "date": "2025-01-11",
+      "running": 14900.0,
+      "bank": 14800.0,
+      "status": "DIVERGE",
+      "discrepancy": 100.0
+    },
+    {
+      "date": "2025-01-12",
+      "running": 14300.0,
+      "bank": 14100.0,
+      "status": "MISMATCH",
+      "discrepancy": 200.0
+    },
+    {
+      "date": "2025-01-13",
+      "running": 17300.0,
+      "bank": 17100.0,
+      "status": "DIVERGE",
+      "discrepancy": 200.0
+    },
+    {
+      "date": "2025-01-14",
+      "running": 17100.0,
+      "bank": 16900.0,
+      "status": "DIVERGE",
+      "discrepancy": 200.0
+    },
+    {
+      "date": "2025-01-15",
+      "running": 16350.0,
+      "bank": 16150.0,
+      "status": "DIVERGE",
+      "discrepancy": 200.0
+    }
+  ],
+  "all_match": false,
+  "mismatch_count": 3,
+  "summary": {
+    "final_running_balance": 16350.0,
+    "final_bank_balance": 16150.0,
+    "net_discrepancy": 200.0,
+    "gaps": [
+      {
+        "id": 1,
+        "started": "2025-01-04",
+        "resolved": "2025-01-06",
+        "amount": 100.0
+      },
+      {
+        "id": 2,
+        "started": "2025-01-10",
+        "resolved": null,
+        "amount": 100.0
+      },
+      {
+        "id": 3,
+        "started": "2025-01-12",
+        "resolved": null,
+        "amount": 200.0
+      }
+    ]
+  }
+}

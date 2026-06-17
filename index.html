@@ -20,13 +20,19 @@
       font-weight: 700;
       margin-bottom: 32px;
       text-align: center;
-      letter-spacing: -0.3px;
+    }
+
+    h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: #374151;
     }
 
     .drop-row {
       display: flex;
       gap: 16px;
-      max-width: 800px;
+      max-width: 860px;
       margin: 0 auto 32px;
     }
 
@@ -42,15 +48,8 @@
       position: relative;
     }
 
-    .drop-zone.over {
-      border-color: #4f8ef7;
-      background: #eef3ff;
-    }
-
-    .drop-zone.loaded {
-      border-color: #34c759;
-      background: #f0faf3;
-    }
+    .drop-zone.over  { border-color: #4f8ef7; background: #eef3ff; }
+    .drop-zone.loaded { border-color: #34c759; background: #f0faf3; }
 
     .drop-zone input[type="file"] {
       position: absolute;
@@ -61,26 +60,10 @@
       height: 100%;
     }
 
-    .drop-icon { font-size: 2rem; margin-bottom: 8px; }
-
-    .drop-label {
-      font-weight: 600;
-      font-size: 0.95rem;
-      margin-bottom: 4px;
-    }
-
-    .drop-hint {
-      font-size: 0.8rem;
-      color: #6b7280;
-    }
-
-    .drop-filename {
-      margin-top: 8px;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: #34c759;
-      min-height: 1.2em;
-    }
+    .drop-icon  { font-size: 2rem; margin-bottom: 8px; }
+    .drop-label { font-weight: 600; font-size: 0.95rem; margin-bottom: 4px; }
+    .drop-hint  { font-size: 0.8rem; color: #6b7280; }
+    .drop-filename { margin-top: 8px; font-size: 0.8rem; font-weight: 600; color: #34c759; min-height: 1.2em; }
 
     .run-btn {
       display: block;
@@ -96,27 +79,56 @@
       transition: background 0.2s, opacity 0.2s;
     }
 
-    .run-btn:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
+    .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
     .run-btn:not(:disabled):hover { background: #3a78e0; }
 
-    #report { max-width: 800px; margin: 0 auto; }
+    #report { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px; }
 
-    .summary {
+    /* Status banner */
+    .banner {
       text-align: center;
       font-size: 1.1rem;
       font-weight: 700;
       padding: 14px;
       border-radius: 10px;
-      margin-bottom: 20px;
+    }
+    .banner.ok   { background: #d1fae5; color: #065f46; }
+    .banner.fail { background: #fee2e2; color: #991b1b; }
+
+    /* Summary cards */
+    .cards {
+      display: flex;
+      gap: 16px;
     }
 
-    .summary.ok { background: #d1fae5; color: #065f46; }
-    .summary.fail { background: #fee2e2; color: #991b1b; }
+    .card {
+      flex: 1;
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.08);
+      text-align: center;
+    }
 
+    .card-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #6b7280;
+      margin-bottom: 8px;
+    }
+
+    .card-value {
+      font-size: 1.4rem;
+      font-weight: 700;
+    }
+
+    .card-value.positive { color: #065f46; }
+    .card-value.negative { color: #991b1b; }
+    .card-value.neutral  { color: #1a1a2e; }
+
+    /* Shared table styles */
     table {
       width: 100%;
       border-collapse: collapse;
@@ -130,9 +142,15 @@
     th, td { padding: 12px 16px; text-align: right; font-size: 0.9rem; }
     th:first-child, td:first-child { text-align: left; }
 
-    tbody tr.match { background: #d1fae5; color: #065f46; }
+    /* Episode table */
+    .gap-resolved   { background: #d1fae5; color: #065f46; }
+    .gap-unresolved { background: #fee2e2; color: #991b1b; }
+
+    /* Row-by-row log */
+    tbody tr.match    { background: #d1fae5; color: #065f46; }
     tbody tr.mismatch { background: #fee2e2; color: #991b1b; }
-    tbody tr.no-bank { background: #fef9c3; color: #713f12; }
+    tbody tr.diverge  { background: #fff7ed; color: #9a3412; }
+    tbody tr.no-bank  { background: #fef9c3; color: #713f12; }
 
     .badge {
       display: inline-block;
@@ -142,9 +160,37 @@
       font-weight: 700;
     }
 
-    .badge.ok { background: #34c759; color: #fff; }
+    .badge.ok       { background: #34c759; color: #fff; }
     .badge.mismatch { background: #ff3b30; color: #fff; }
-    .badge.no-bank { background: #f59e0b; color: #fff; }
+    .badge.diverge  { background: #f97316; color: #fff; }
+    .badge.no-bank  { background: #f59e0b; color: #fff; }
+    .badge.resolved   { background: #34c759; color: #fff; }
+    .badge.unresolved { background: #ff3b30; color: #fff; }
+
+    /* Action buttons row */
+    .action-row {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .action-btn {
+      padding: 8px 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 7px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .action-btn.download { background: #1a1a2e; color: #fff; }
+    .action-btn.download:hover { background: #374151; }
+    .action-btn.view-log { background: #e5e7eb; color: #1a1a2e; }
+    .action-btn.view-log:hover { background: #d1d5db; }
+
+    .log-section { display: none; }
+    .log-section.visible { display: block; }
 
     .error-msg {
       text-align: center;
@@ -186,7 +232,7 @@
   const files = { tx: null, bank: null };
 
   function setupZone(zoneId, fileId, nameId, key) {
-    const zone = document.getElementById(zoneId);
+    const zone  = document.getElementById(zoneId);
     const input = document.getElementById(fileId);
     const nameEl = document.getElementById(nameId);
 
@@ -222,12 +268,11 @@
     form.append('bank_balances', files.bank);
 
     try {
-      const res = await fetch('/reconcile', { method: 'POST', body: form });
+      const res  = await fetch('/reconcile', { method: 'POST', body: form });
       const data = await res.json();
 
       if (data.error) {
-        document.getElementById('report').innerHTML =
-          `<div class="error-msg">${data.error}</div>`;
+        document.getElementById('report').innerHTML = `<div class="error-msg">${data.error}</div>`;
         return;
       }
 
@@ -245,50 +290,187 @@
     return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
-  function render(data) {
-    const summaryClass = data.all_match ? 'ok' : 'fail';
-    const summaryText = data.all_match
-      ? 'All dates reconcile.'
-      : 'Discrepancies found — see highlighted rows.';
+  function fmtSigned(n) {
+    const abs = Math.abs(n);
+    return n === 0 ? '$0.00' : (n > 0 ? '+$' : '-$') + fmt(abs);
+  }
 
-    const tableRows = data.rows.map(r => {
+  function fmtTimestamp(date) {
+    return date.toLocaleString('en-US', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    });
+  }
+
+  function triggerDownload(content, filename) {
+    const blob = new Blob([content], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function downloadLogCSV(rows, timestamp) {
+    const lines = [`Generated: ${timestamp}`, 'Date,Running Balance,Bank Balance,Discrepancy,Status'];
+    for (const r of rows) {
+      lines.push([
+        r.date,
+        r.running.toFixed(2),
+        r.bank        !== null ? r.bank.toFixed(2)        : '',
+        r.discrepancy !== null ? r.discrepancy.toFixed(2) : '',
+        r.status
+      ].join(','));
+    }
+    triggerDownload(lines.join('\n'), 'reconciliation_log.csv');
+  }
+
+  function downloadGapsCSV(gaps, timestamp) {
+    const lines = [`Generated: ${timestamp}`, '#,Started,Resolved,Amount Off,Status'];
+    for (const g of gaps) {
+      lines.push([
+        g.id,
+        g.started,
+        g.resolved ?? '',
+        g.amount.toFixed(2),
+        g.resolved ? 'Resolved' : 'Unresolved'
+      ].join(','));
+    }
+    triggerDownload(lines.join('\n'), 'discrepancy_report.csv');
+  }
+
+  function render(data) {
+    const s = data.summary;
+    const timestamp = fmtTimestamp(new Date());
+
+    // Banner
+    const bannerClass = data.all_match ? 'ok' : 'fail';
+    const bannerText  = data.all_match
+      ? 'All dates reconcile.'
+      : `${data.mismatch_count} discrepanc${data.mismatch_count === 1 ? 'y' : 'ies'} found.`;
+
+    // Summary cards
+    const netClass = s.net_discrepancy === 0 ? 'positive'
+                   : s.net_discrepancy > 0   ? 'negative' : 'negative';
+    const cards = `
+      <div class="cards">
+        <div class="card">
+          <div class="card-label">Final Running Balance</div>
+          <div class="card-value neutral">$${fmt(s.final_running_balance)}</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Final Bank Balance</div>
+          <div class="card-value neutral">$${fmt(s.final_bank_balance)}</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Net Discrepancy</div>
+          <div class="card-value ${s.net_discrepancy === 0 ? 'positive' : 'negative'}">${fmtSigned(s.net_discrepancy)}</div>
+        </div>
+      </div>`;
+
+    // Episode table
+    const gapRows = s.gaps.length === 0
+      ? '<tr><td colspan="5" style="text-align:center;color:#6b7280;padding:20px">No discrepancies detected</td></tr>'
+      : s.gaps.map(ep => {
+          const resolved  = ep.resolved ?? '—';
+          const rowClass  = ep.resolved ? 'gap-resolved' : 'gap-unresolved';
+          const badge     = ep.resolved
+            ? '<span class="badge resolved">Resolved</span>'
+            : '<span class="badge unresolved">Unresolved</span>';
+          return `<tr class="${rowClass}">
+            <td>${ep.id}</td>
+            <td>${ep.started}</td>
+            <td>${resolved}</td>
+            <td>${fmtSigned(ep.amount)}</td>
+            <td>${badge}</td>
+          </tr>`;
+        }).join('');
+
+    const gapTable = `
+      <div>
+        <h2>Discrepancy Report</h2>
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align:left">#</th>
+              <th style="text-align:left">Started</th>
+              <th style="text-align:left">Resolved</th>
+              <th>Amount Off</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>${gapRows}</tbody>
+        </table>
+      </div>`;
+
+    // Row-by-row log
+    const logRows = data.rows.map(r => {
       if (r.status === 'NO_RECORD') {
         return `<tr class="no-bank">
           <td>${r.date}</td>
           <td>$${fmt(r.running)}</td>
           <td>—</td>
+          <td>—</td>
           <td><span class="badge no-bank">NO RECORD</span></td>
         </tr>`;
       }
-      const cls = r.status === 'OK' ? 'match' : 'mismatch';
-      const badge = r.status === 'OK'
-        ? '<span class="badge ok">OK</span>'
-        : '<span class="badge mismatch">MISMATCH</span>';
-      return `<tr class="${cls}">
+      const clsMap   = { OK: 'match', MISMATCH: 'mismatch', DIVERGE: 'diverge' };
+      const badgeMap = {
+        OK:       '<span class="badge ok">OK</span>',
+        MISMATCH: '<span class="badge mismatch">MISMATCH</span>',
+        DIVERGE:  '<span class="badge diverge">DIVERGE</span>',
+      };
+      const discStr = r.discrepancy !== 0 ? fmtSigned(r.discrepancy) : '—';
+      return `<tr class="${clsMap[r.status]}">
         <td>${r.date}</td>
         <td>$${fmt(r.running)}</td>
         <td>$${fmt(r.bank)}</td>
-        <td>${badge}</td>
+        <td>${discStr}</td>
+        <td>${badgeMap[r.status]}</td>
       </tr>`;
     }).join('');
 
-    document.getElementById('report').innerHTML = `
-      <div class="summary ${summaryClass}">${summaryText}</div>
-      <table>
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Running Balance</th>
-            <th>Bank Balance</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>${tableRows}</tbody>
-      </table>
-    `;
+    const logSection = `
+      <div class="log-section" id="log-section">
+        <h2>Day-by-Day Log</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Running Balance</th>
+              <th>Bank Balance</th>
+              <th>Discrepancy</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>${logRows}</tbody>
+        </table>
+      </div>`;
+
+    const actionRow = `
+      <div class="action-row">
+        <span style="font-size:0.78rem;color:#6b7280;align-self:center">Generated: ${timestamp}</span>
+        <button class="action-btn download" id="dl-gaps-btn">Download Discrepancy Report</button>
+        <button class="action-btn download" id="dl-log-btn">Download Log CSV</button>
+        <button class="action-btn view-log" id="view-log-btn">View Log</button>
+      </div>`;
+
+    document.getElementById('report').innerHTML =
+      `<div class="banner ${bannerClass}">${bannerText}</div>${cards}${actionRow}${gapTable}${logSection}`;
+
+    document.getElementById('dl-gaps-btn').addEventListener('click', () => downloadGapsCSV(data.summary.gaps, timestamp));
+    document.getElementById('dl-log-btn').addEventListener('click',  () => downloadLogCSV(data.rows, timestamp));
+
+    const logEl  = document.getElementById('log-section');
+    const logBtn = document.getElementById('view-log-btn');
+    logBtn.addEventListener('click', () => {
+      const visible = logEl.classList.toggle('visible');
+      logBtn.textContent = visible ? 'Hide Log' : 'View Log';
+    });
   }
 
-  setupZone('zone-tx', 'file-tx', 'name-tx', 'tx');
+  setupZone('zone-tx',   'file-tx',   'name-tx',   'tx');
   setupZone('zone-bank', 'file-bank', 'name-bank', 'bank');
   document.getElementById('run-btn').addEventListener('click', reconcile);
 </script>
