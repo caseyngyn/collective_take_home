@@ -53,15 +53,16 @@ def reconcile_data(tx_text, bank_text):
 
     all_dates = sorted(set(totals) | set(bank))
 
-    # if day one doesn't agree, stop code
-    first_date = all_dates[0]
+    # warn if day one doesn't agree — results may reflect a prior period issue
+    first_date   = all_dates[0]
     opening_tx   = totals.get(first_date, 0.0)
     opening_bank = bank.get(first_date)
+    warning = None
     if opening_bank is not None and round(opening_tx - opening_bank, 2) != 0:
-        raise ValueError(
+        warning = (
             f"Opening balance mismatch on {first_date}: "
             f"transactions show {opening_tx:.2f}, bank shows {opening_bank:.2f}. "
-            f"Resolve the starting balance before reconciling."
+            f"Results may be affected by a prior period issue."
         )
 
     running_balance = 0.0
@@ -106,6 +107,7 @@ def reconcile_data(tx_text, bank_text):
         "rows": rows,
         "all_match": all_match,
         "mismatch_count": mismatch_count,
+        "warning": warning,
         "summary": {
             "final_running_balance": running_balance,
             "final_bank_balance": final_bank_balance,

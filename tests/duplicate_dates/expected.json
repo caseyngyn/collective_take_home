@@ -2,13 +2,26 @@
   "all_match": true,
   "mismatch_count": 0,
   "rows": [
-    {"date": "2025-01-01", "running": 750.0, "bank": 750.0, "status": "OK", "discrepancy": 0.0},
-    {"date": "2025-01-02", "running": 650.0, "bank": 650.0, "status": "OK", "discrepancy": 0.0}
+    {
+      "date": "2025-01-01",
+      "running": 750.0,
+      "bank": 750.0,
+      "status": "OK",
+      "discrepancy": 0.0
+    },
+    {
+      "date": "2025-01-02",
+      "running": 650.0,
+      "bank": 650.0,
+      "status": "OK",
+      "discrepancy": 0.0
+    }
   ],
   "summary": {
     "final_running_balance": 650.0,
     "final_bank_balance": 650.0,
     "net_discrepancy": 0.0,
     "gaps": []
-  }
+  },
+  "warning": null
 }

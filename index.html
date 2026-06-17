@@ -92,8 +92,9 @@
       padding: 14px;
       border-radius: 10px;
     }
-    .banner.ok   { background: #d1fae5; color: #065f46; }
-    .banner.fail { background: #fee2e2; color: #991b1b; }
+    .banner.ok      { background: #d1fae5; color: #065f46; }
+    .banner.fail    { background: #fee2e2; color: #991b1b; }
+    .banner.warning { background: #fef9c3; color: #713f12; }
 
     /* Summary cards */
     .cards {
@@ -456,8 +457,12 @@
         <button class="action-btn view-log" id="view-log-btn">View Log</button>
       </div>`;
 
+    const warningBanner = data.warning
+      ? `<div class="banner warning">Warning: ${data.warning}</div>`
+      : '';
+
     document.getElementById('report').innerHTML =
-      `<div class="banner ${bannerClass}">${bannerText}</div>${cards}${actionRow}${gapTable}${logSection}`;
+      `<div class="banner ${bannerClass}">${bannerText}</div>${warningBanner}${cards}${actionRow}${gapTable}${logSection}`;
 
     document.getElementById('dl-gaps-btn').addEventListener('click', () => downloadGapsCSV(data.summary.gaps, timestamp));
     document.getElementById('dl-log-btn').addEventListener('click',  () => downloadLogCSV(data.rows, timestamp));
