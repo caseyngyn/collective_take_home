@@ -11,13 +11,13 @@ def index():
 
 @app.route("/reconcile", methods=["POST"])
 def reconcile_endpoint():
-    tx_file = request.files.get("transactions")
+    tx_file   = request.files.get("transactions")
     bank_file = request.files.get("bank_balances")
 
     if not tx_file or not bank_file:
         return jsonify({"error": "Both files are required"}), 400
 
-    tx_text = tx_file.read().decode("utf-8")
+    tx_text   = tx_file.read().decode("utf-8")
     bank_text = bank_file.read().decode("utf-8")
 
     try:

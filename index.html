@@ -145,7 +145,6 @@
     /* Row-by-row log */
     tbody tr.match    { background: #d1fae5; color: #065f46; }
     tbody tr.mismatch { background: #fee2e2; color: #991b1b; }
-    tbody tr.diverge  { background: #fff7ed; color: #9a3412; }
     tbody tr.no-bank  { background: #fef9c3; color: #713f12; }
 
     .badge {
@@ -158,10 +157,7 @@
 
     .badge.ok       { background: #34c759; color: #fff; }
     .badge.mismatch { background: #ff3b30; color: #fff; }
-    .badge.diverge  { background: #f97316; color: #fff; }
     .badge.no-bank  { background: #f59e0b; color: #fff; }
-    .badge.resolved   { background: #34c759; color: #fff; }
-    .badge.unresolved { background: #ff3b30; color: #fff; }
 
     /* Action buttons row */
     .action-row {
@@ -309,33 +305,35 @@
     URL.revokeObjectURL(url);
   }
 
-  function downloadLogCSV(rows, timestamp) {
-    const lines = [`Generated: ${timestamp}`, 'Date,Running Balance,Bank Balance,Discrepancy,Status'];
+  function downloadLogCSV(rows, discrepancies, timestamp) {
+    const lines = [`Generated: ${timestamp}`];
+
+    lines.push('', 'DAY-BY-DAY LOG');
+    lines.push('Date,Running Balance,Bank Balance,Change,Status');
     for (const r of rows) {
       lines.push([
         r.date,
         r.running.toFixed(2),
-        r.bank        !== null ? r.bank.toFixed(2)        : '',
-        r.discrepancy !== null ? r.discrepancy.toFixed(2) : '',
+        r.bank  !== null ? r.bank.toFixed(2)  : '',
+        r.delta !== null ? r.delta.toFixed(2) : '',
         r.status
       ].join(','));
     }
-    triggerDownload(lines.join('\n'), 'reconciliation_log.csv');
+
+    lines.push('', 'DISCREPANCY REPORT');
+    lines.push('Date,Discrepancy');
+    if (discrepancies.length === 0) {
+      lines.push('No discrepancies detected');
+    } else {
+      for (const d of discrepancies) {
+        lines.push([d.date, d.discrepancy.toFixed(2)].join(','));
+      }
+    }
+
+    const slug = timestamp.replace(/[/,:\s]/g, '-');
+    triggerDownload(lines.join('\n'), `reconciliation_log_${slug}.csv`);
   }
 
-  function downloadGapsCSV(gaps, timestamp) {
-    const lines = [`Generated: ${timestamp}`, '#,Started,Resolved,Amount Off,Status'];
-    for (const g of gaps) {
-      lines.push([
-        g.id,
-        g.started,
-        g.resolved ?? '',
-        g.amount.toFixed(2),
-        g.resolved ? 'Resolved' : 'Unresolved'
-      ].join(','));
-    }
-    triggerDownload(lines.join('\n'), 'discrepancy_report.csv');
-  }
 
   function render(data) {
     const s = data.summary;
@@ -366,21 +364,14 @@
         </div>
       </div>`;
 
-    // Episode table
-    const gapRows = s.gaps.length === 0
-      ? '<tr><td colspan="5" style="text-align:center;color:#6b7280;padding:20px">No discrepancies detected</td></tr>'
-      : s.gaps.map(ep => {
-          const resolved  = ep.resolved ?? '—';
-          const rowClass  = ep.resolved ? 'gap-resolved' : 'gap-unresolved';
-          const badge     = ep.resolved
-            ? '<span class="badge resolved">Resolved</span>'
-            : '<span class="badge unresolved">Unresolved</span>';
+    // Discrepancy report
+    const discRows = s.discrepancies.length === 0
+      ? '<tr><td colspan="2" style="text-align:center;color:#6b7280;padding:20px">No discrepancies detected</td></tr>'
+      : s.discrepancies.map(d => {
+          const rowClass = d.discrepancy === 0 ? 'match' : 'mismatch';
           return `<tr class="${rowClass}">
-            <td>${ep.id}</td>
-            <td>${ep.started}</td>
-            <td>${resolved}</td>
-            <td>${fmtSigned(ep.amount)}</td>
-            <td>${badge}</td>
+            <td>${d.date}</td>
+            <td>${fmtSigned(d.discrepancy)}</td>
           </tr>`;
         }).join('');
 
@@ -390,14 +381,11 @@
         <table>
           <thead>
             <tr>
-              <th style="text-align:left">#</th>
-              <th style="text-align:left">Started</th>
-              <th style="text-align:left">Resolved</th>
-              <th>Amount Off</th>
-              <th>Status</th>
+              <th>Date</th>
+              <th>Discrepancy</th>
             </tr>
           </thead>
-          <tbody>${gapRows}</tbody>
+          <tbody>${discRows}</tbody>
         </table>
       </div>`;
 
@@ -412,13 +400,12 @@
           <td><span class="badge no-bank">NO RECORD</span></td>
         </tr>`;
       }
-      const clsMap   = { OK: 'match', MISMATCH: 'mismatch', DIVERGE: 'diverge' };
+      const clsMap   = { OK: 'match', MISMATCH: 'mismatch' };
       const badgeMap = {
         OK:       '<span class="badge ok">OK</span>',
         MISMATCH: '<span class="badge mismatch">MISMATCH</span>',
-        DIVERGE:  '<span class="badge diverge">DIVERGE</span>',
       };
-      const discStr = r.discrepancy !== 0 ? fmtSigned(r.discrepancy) : '—';
+      const discStr = r.delta !== null ? fmtSigned(r.delta) : '—';
       return `<tr class="${clsMap[r.status]}">
         <td>${r.date}</td>
         <td>$${fmt(r.running)}</td>
@@ -437,7 +424,7 @@
               <th>Date</th>
               <th>Running Balance</th>
               <th>Bank Balance</th>
-              <th>Discrepancy</th>
+              <th>Change</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -448,7 +435,6 @@
     const actionRow = `
       <div class="action-row">
         <span style="font-size:0.78rem;color:#6b7280;align-self:center">Generated: ${timestamp}</span>
-        <button class="action-btn download" id="dl-gaps-btn">Download Discrepancy Report</button>
         <button class="action-btn download" id="dl-log-btn">Download Log CSV</button>
         <button class="action-btn view-log" id="view-log-btn">View Log</button>
       </div>`;
@@ -460,8 +446,7 @@
     document.getElementById('report').innerHTML =
       `<div class="banner ${bannerClass}">${bannerText}</div>${warningBanner}${cards}${actionRow}${gapTable}${logSection}`;
 
-    document.getElementById('dl-gaps-btn').addEventListener('click', () => downloadGapsCSV(data.summary.gaps, timestamp));
-    document.getElementById('dl-log-btn').addEventListener('click',  () => downloadLogCSV(data.rows, timestamp));
+    document.getElementById('dl-log-btn').addEventListener('click', () => downloadLogCSV(data.rows, data.summary.discrepancies, timestamp));
 
     const logEl  = document.getElementById('log-section');
     const logBtn = document.getElementById('view-log-btn');

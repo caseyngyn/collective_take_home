@@ -9,33 +9,6 @@ def clean_number(value):
     return float(re.sub(r'[^\d.\-]', '', value.strip()))
 
 
-def build_gaps(rows):
-    gaps = []
-    current_gap = None
-
-    for row in rows:
-        if row["status"] == "MISMATCH":
-            # if a new mismatch starts while one is already open, close the old one as unresolved
-            if current_gap:
-                gaps.append(current_gap)
-            current_gap = {
-                "id": len(gaps) + 1,
-                "started": row["date"],
-                "resolved": None,
-                "amount": row["discrepancy"],
-            }
-        elif row["status"] == "OK" and current_gap:
-            # gap self-corrected — likely a timing difference
-            current_gap["resolved"] = row["date"]
-            gaps.append(current_gap)
-            current_gap = None
-
-    # gap still open at end of data — unresolved, needs investigation
-    if current_gap:
-        gaps.append(current_gap)
-
-    return gaps
-
 
 def reconcile_data(tx_text, bank_text):
     # sum amounts per date so duplicate transaction dates are combined
@@ -69,8 +42,10 @@ def reconcile_data(tx_text, bank_text):
     all_match = True
     mismatch_count = 0
     last_discrepancy = None
+    prev_discrepancy = 0.0
     final_bank_balance = None
     rows = []
+    discrepancies = []
 
     for d in all_dates:
         running_balance += totals.get(d, 0.0)
@@ -78,28 +53,32 @@ def reconcile_data(tx_text, bank_text):
 
         # date exists in transactions but not in bank — flag and continue
         if bank_balance is None:
-            rows.append({"date": d, "running": running_balance, "bank": None, "status": "NO_RECORD", "discrepancy": None})
+            rows.append({"date": d, "running": running_balance, "bank": None, "status": "NO_RECORD", "discrepancy": None, "delta": None})
             continue
 
         final_bank_balance = bank_balance
         discrepancy = round(running_balance - bank_balance, 2)
+        delta = round(discrepancy - prev_discrepancy, 2)
+
+        # log when a non-zero discrepancy appears or changes — zero means clean, not a discrepancy
+        if discrepancy != 0 and discrepancy != prev_discrepancy:
+            discrepancies.append({"date": d, "discrepancy": discrepancy})
+
+        prev_discrepancy = discrepancy
 
         if discrepancy == 0:
             status = "OK"
             last_discrepancy = None
         elif discrepancy == last_discrepancy:
-            # same gap as yesterday — discrepancy is carrying forward unchanged
-            status = "DIVERGE"
+            status = "MISMATCH"
         else:
-            # new discrepancy or the gap amount changed — open a new mismatch
+            # new discrepancy or gap amount changed
             status = "MISMATCH"
             mismatch_count += 1
             all_match = False
             last_discrepancy = discrepancy
 
-        rows.append({"date": d, "running": running_balance, "bank": bank_balance, "status": status, "discrepancy": discrepancy})
-
-    gaps = build_gaps(rows)
+        rows.append({"date": d, "running": running_balance, "bank": bank_balance, "status": status, "discrepancy": discrepancy, "delta": delta})
 
     net_discrepancy = round(running_balance - final_bank_balance, 2) if final_bank_balance is not None else None
 
@@ -112,6 +91,6 @@ def reconcile_data(tx_text, bank_text):
             "final_running_balance": running_balance,
             "final_bank_balance": final_bank_balance,
             "net_discrepancy": net_discrepancy,
-            "gaps": gaps,
+            "discrepancies": discrepancies,
         },
     }

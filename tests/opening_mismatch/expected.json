@@ -5,14 +5,16 @@
       "running": 500.0,
       "bank": 600.0,
       "status": "MISMATCH",
-      "discrepancy": -100.0
+      "discrepancy": -100.0,
+      "delta": -100.0
     },
     {
       "date": "2025-01-02",
       "running": 450.0,
       "bank": 550.0,
-      "status": "DIVERGE",
-      "discrepancy": -100.0
+      "status": "MISMATCH",
+      "discrepancy": -100.0,
+      "delta": 0.0
     }
   ],
   "all_match": false,
@@ -22,12 +24,10 @@
     "final_running_balance": 450.0,
     "final_bank_balance": 550.0,
     "net_discrepancy": -100.0,
-    "gaps": [
+    "discrepancies": [
       {
-        "id": 1,
-        "started": "2025-01-01",
-        "resolved": null,
-        "amount": -100.0
+        "date": "2025-01-01",
+        "discrepancy": -100.0
       }
     ]
   }

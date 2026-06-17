@@ -13,20 +13,21 @@ Each row's date and amount are stripped of whitespace and currency symbols. Amou
 Each row is loaded into a date-keyed dictionary. If the same date appears twice, an error is raised immediately — a bank statement should never have two balances for the same day.
 
 **3. Opening balance check**
-Before any comparison, the very first date is checked. If the transaction total on day one does not match the bank balance on day one, reconciliation halts with a clear error. A bad starting point would make every subsequent row meaningless.
+Before any comparison, the very first date is checked. If the transaction total on day one does not match the bank balance on day one, a warning is shown but reconciliation continues — the accountant can see the full picture and judge whether it's a prior period issue.
 
 **4. Day-by-day comparison**
 All dates from both files are merged and sorted. For each date the function accumulates a running balance from transactions and compares it against the bank's reported balance for that day:
 - **OK** — running balance matches the bank
 - **NO RECORD** — no bank entry for this date; running balance carries forward
-- **MISMATCH** — discrepancy detected, or the discrepancy amount changed from the previous day
-- **DIVERGE** — same discrepancy as the previous day, carrying forward unchanged
+- **MISMATCH** — discrepancy detected or the discrepancy amount changed from the previous day
 
-**5. Gap detection**
-After the row-by-row pass, the function groups consecutive MISMATCH and DIVERGE rows into gaps. Each gap records when it started, when (if) it resolved, and the amount off. A gap that self-corrects back to OK is likely a timing difference; one that never resolves needs investigation.
+A **Change** (delta) column shows how much the discrepancy moved on each specific day. A `$0.00` change on a MISMATCH row means the same gap is carrying forward unchanged.
+
+**5. Discrepancy log**
+After the row-by-row pass, a separate list records every date where a non-zero discrepancy first appeared or changed. Dates where the discrepancy returned to zero are excluded — zero means clean and does not belong in a discrepancy report.
 
 **6. Summary**
-Returns the final running balance, the final bank balance, the net discrepancy, and the list of gaps — everything the UI needs to render the report.
+Returns the final running balance, the final bank balance, the net discrepancy, and the discrepancy log — everything the UI needs to render the report.
 
 ## Setup
 
@@ -48,14 +49,20 @@ Then open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser.
 2. Drop in your **bank balances CSV** — must have `date` and `balance` columns.
 3. Click **Reconcile**.
 
-Each row in the day-by-day log shows the cumulative running balance from transactions vs. the bank's reported balance:
+### Report sections
 
+**Summary cards** — Final running balance, final bank balance, and net discrepancy at a glance.
+
+**Discrepancy Report** — A concise table showing every date a non-zero discrepancy appeared or changed, with the discrepancy amount. Resolutions back to zero are excluded.
+
+**Day-by-Day Log** — Full row-by-row breakdown (hidden by default, toggle with View Log):
 - **Green (OK)** — running balance matches the bank
-- **Red (MISMATCH)** — new discrepancy detected, or the discrepancy amount changed
-- **Orange (DIVERGE)** — same discrepancy as the previous day, carrying forward unchanged
+- **Red (MISMATCH)** — discrepancy detected or changed; the Change column shows how much moved that day
 - **Yellow (NO RECORD)** — date has a transaction but no corresponding bank entry
 
-The **Discrepancy Report** groups mismatches into gaps showing when each started, when (if) it resolved, and how much is off.
+### Downloading
+
+Click **Download Log CSV** to export a timestamped file containing both the day-by-day log and the discrepancy report. The filename includes the date and time the report was generated (e.g. `reconciliation_log_06-17-2026-14-32-05.csv`) so every download is uniquely identifiable.
 
 ## CSV Format
 
@@ -80,7 +87,7 @@ date,balance
 |---|---|
 | Duplicate dates in transactions | Amounts are summed into a single entry before reconciling |
 | Duplicate dates in bank balances | Rejected as a data error — bank statements should not have two balances for the same day |
-| Opening balance mismatch | Halts immediately before processing any further rows — every subsequent comparison would be poisoned by a bad starting point |
+| Opening balance mismatch | Warning shown above the report; reconciliation continues so the full period is still visible |
 | Whitespace in values | Stripped from dates and amounts before parsing |
 | Currency symbols (`$` `£` `€` `¥` `₹` `₩` `₪`) | Stripped before converting to a number |
 | Comma-formatted numbers (`$1,000.00`) | Commas removed — values must be quoted in the CSV (`"$1,000.00"`) since unquoted commas are treated as column separators |
@@ -89,9 +96,10 @@ date,balance
 | Case | Behaviour |
 |---|---|
 | Missing bank record for a date | Flagged as NO RECORD, running balance carries forward, reconciliation continues |
-| Discrepancy on one day that self-corrects | MISMATCH → DIVERGE → OK; recorded as a resolved gap (likely a timing difference) |
-| Discrepancy that persists unchanged | MISMATCH followed by DIVERGE rows; recorded as an unresolved gap |
-| Discrepancy that changes amount mid-period | Each change triggers a new MISMATCH and opens a new gap; the prior gap is closed as unresolved |
+| Discrepancy that self-corrects | Shows MISMATCH while the gap is open; Change column returns to $0.00 when resolved |
+| Discrepancy that persists unchanged | Continues to show MISMATCH with Change of $0.00 each day |
+| Discrepancy that changes amount mid-period | New MISMATCH with a non-zero Change on the day the amount shifts |
+| Discrepancy returning to zero | Excluded from the discrepancy report — zero means clean |
 | Negative running balance | Handled correctly — compared against bank balance as-is |
 
 ## Running Tests
@@ -106,10 +114,10 @@ python run_tests.py
 | `all_match` | Happy path — all dates reconcile |
 | `mismatch` | Single discrepancy that self-resolves |
 | `diverge` | Discrepancy that carries forward unresolved |
-| `complex_discrepancies` | Multi-gap scenario: timing difference, persistent gap, changing gap, missing bank record |
+| `complex_discrepancies` | Multi-discrepancy scenario: timing difference, persistent gap, changing gap, missing bank record |
 | `duplicate_dates` | Duplicate transaction dates combined before comparison |
 | `duplicate_bank_dates` | Duplicate bank dates rejected with error |
-| `opening_mismatch` | Mismatched day-one balance halts reconciliation |
+| `opening_mismatch` | Mismatched day-one balance shows warning and continues |
 | `no_bank_record` | Missing bank entry handled gracefully |
 | `negative_balance` | Running balance goes negative |
 | `dirty_data` | Mixed currency symbols, whitespace, comma-formatted numbers |

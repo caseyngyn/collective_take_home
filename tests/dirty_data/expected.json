@@ -5,58 +5,65 @@
       "running": 1000.0,
       "bank": 1000.0,
       "status": "OK",
-      "discrepancy": 0.0
+      "discrepancy": 0.0,
+      "delta": 0.0
     },
     {
       "date": "2025-01-02",
       "running": 950.0,
       "bank": 950.0,
       "status": "OK",
-      "discrepancy": 0.0
+      "discrepancy": 0.0,
+      "delta": 0.0
     },
     {
       "date": "2025-01-03",
       "running": 1150.0,
       "bank": 1150.0,
       "status": "OK",
-      "discrepancy": 0.0
+      "discrepancy": 0.0,
+      "delta": 0.0
     },
     {
       "date": "2025-01-04",
       "running": 1050.0,
       "bank": 1050.0,
       "status": "OK",
-      "discrepancy": 0.0
+      "discrepancy": 0.0,
+      "delta": 0.0
     },
     {
       "date": "2025-01-05",
       "running": 1550.0,
       "bank": 1550.0,
       "status": "OK",
-      "discrepancy": 0.0
+      "discrepancy": 0.0,
+      "delta": 0.0
     },
     {
       "date": "2025-01-06",
       "running": 1475.0,
       "bank": 1475.0,
       "status": "OK",
-      "discrepancy": 0.0
+      "discrepancy": 0.0,
+      "delta": 0.0
     },
     {
       "date": "2025-01-07",
       "running": 1725.0,
       "bank": 1725.0,
       "status": "OK",
-      "discrepancy": 0.0
+      "discrepancy": 0.0,
+      "delta": 0.0
     }
   ],
   "all_match": true,
   "mismatch_count": 0,
+  "warning": null,
   "summary": {
     "final_running_balance": 1725.0,
     "final_bank_balance": 1725.0,
     "net_discrepancy": 0.0,
-    "gaps": []
-  },
-  "warning": null
+    "discrepancies": []
+  }
 }
