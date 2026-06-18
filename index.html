@@ -308,14 +308,14 @@
   function downloadLogCSV(rows, discrepancies, timestamp) {
     const lines = [`Generated: ${timestamp}`];
 
-    lines.push('', 'DAY-BY-DAY LOG');
-    lines.push('Date,Running Balance,Bank Balance,Change,Status');
+    lines.push('', 'RECONCILIATION STATEMENT');
+    lines.push('Date,Running Balance,Bank Balance,Discrepancy,Status');
     for (const r of rows) {
       lines.push([
         r.date,
         r.running.toFixed(2),
-        r.bank  !== null ? r.bank.toFixed(2)  : '',
-        r.delta !== null ? r.delta.toFixed(2) : '',
+        r.bank        !== null ? r.bank.toFixed(2)        : '',
+        r.discrepancy !== null ? r.discrepancy.toFixed(2) : '',
         r.status
       ].join(','));
     }
@@ -331,7 +331,7 @@
     }
 
     const slug = timestamp.replace(/[/,:\s]/g, '-');
-    triggerDownload(lines.join('\n'), `reconciliation_log_${slug}.csv`);
+    triggerDownload(lines.join('\n'), `reconciliation_statement_${slug}.csv`);
   }
 
 
@@ -405,7 +405,7 @@
         OK:       '<span class="badge ok">OK</span>',
         MISMATCH: '<span class="badge mismatch">MISMATCH</span>',
       };
-      const discStr = r.delta !== null ? fmtSigned(r.delta) : '—';
+      const discStr = r.discrepancy !== null ? fmtSigned(r.discrepancy) : '—';
       return `<tr class="${clsMap[r.status]}">
         <td>${r.date}</td>
         <td>$${fmt(r.running)}</td>
@@ -417,14 +417,14 @@
 
     const logSection = `
       <div class="log-section" id="log-section">
-        <h2>Day-by-Day Log</h2>
+        <h2>Reconciliation Statement</h2>
         <table>
           <thead>
             <tr>
               <th>Date</th>
               <th>Running Balance</th>
               <th>Bank Balance</th>
-              <th>Change</th>
+              <th>Discrepancy</th>
               <th>Status</th>
             </tr>
           </thead>
@@ -435,8 +435,8 @@
     const actionRow = `
       <div class="action-row">
         <span style="font-size:0.78rem;color:#6b7280;align-self:center">Generated: ${timestamp}</span>
-        <button class="action-btn download" id="dl-log-btn">Download Log CSV</button>
-        <button class="action-btn view-log" id="view-log-btn">View Log</button>
+        <button class="action-btn download" id="dl-log-btn">Download Statement</button>
+        <button class="action-btn view-log" id="view-log-btn">View Statement</button>
       </div>`;
 
     const warningBanner = data.warning
@@ -452,7 +452,7 @@
     const logBtn = document.getElementById('view-log-btn');
     logBtn.addEventListener('click', () => {
       const visible = logEl.classList.toggle('visible');
-      logBtn.textContent = visible ? 'Hide Log' : 'View Log';
+      logBtn.textContent = visible ? 'Hide Statement' : 'View Statement';
     });
   }
 

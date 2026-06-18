@@ -5,16 +5,14 @@
       "running": 100.0,
       "bank": 100.0,
       "status": "OK",
-      "discrepancy": 0.0,
-      "delta": 0.0
+      "discrepancy": 0.0
     },
     {
       "date": "2025-01-02",
       "running": -200.0,
       "bank": -200.0,
       "status": "OK",
-      "discrepancy": 0.0,
-      "delta": 0.0
+      "discrepancy": 0.0
     }
   ],
   "all_match": true,

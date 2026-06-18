@@ -5,16 +5,14 @@
       "running": 500.0,
       "bank": 600.0,
       "status": "MISMATCH",
-      "discrepancy": -100.0,
-      "delta": -100.0
+      "discrepancy": -100.0
     },
     {
       "date": "2025-01-02",
       "running": 450.0,
       "bank": 550.0,
       "status": "MISMATCH",
-      "discrepancy": -100.0,
-      "delta": 0.0
+      "discrepancy": -100.0
     }
   ],
   "all_match": false,

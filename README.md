@@ -21,8 +21,6 @@ All dates from both files are merged and sorted. For each date the function accu
 - **NO RECORD** — no bank entry for this date; running balance carries forward
 - **MISMATCH** — discrepancy detected or the discrepancy amount changed from the previous day
 
-A **Change** (delta) column shows how much the discrepancy moved on each specific day. A `$0.00` change on a MISMATCH row means the same gap is carrying forward unchanged.
-
 **5. Discrepancy log**
 After the row-by-row pass, a separate list records every date where a non-zero discrepancy first appeared or changed. Dates where the discrepancy returned to zero are excluded — zero means clean and does not belong in a discrepancy report.
 
@@ -55,14 +53,14 @@ Then open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser.
 
 **Discrepancy Report** — A concise table showing every date a non-zero discrepancy appeared or changed, with the discrepancy amount. Resolutions back to zero are excluded.
 
-**Day-by-Day Log** — Full row-by-row breakdown (hidden by default, toggle with View Log):
+**Day-by-Day Statement** — Full row-by-row breakdown (hidden by default, toggle with View Statement):
 - **Green (OK)** — running balance matches the bank
-- **Red (MISMATCH)** — discrepancy detected or changed; the Change column shows how much moved that day
+- **Red (MISMATCH)** — running balance does not match the bank; the Discrepancy column shows the gap
 - **Yellow (NO RECORD)** — date has a transaction but no corresponding bank entry
 
 ### Downloading
 
-Click **Download Log CSV** to export a timestamped file containing both the day-by-day log and the discrepancy report. The filename includes the date and time the report was generated (e.g. `reconciliation_log_06-17-2026-14-32-05.csv`) so every download is uniquely identifiable.
+Click **Download Statement** to export a timestamped CSV containing both the reconciliation statement and the discrepancy report. The filename includes the date and time the report was generated (e.g. `reconciliation_statement_06-18-2026-14-32-05.csv`) so every download is uniquely identifiable.
 
 ## CSV Format
 
@@ -96,9 +94,9 @@ date,balance
 | Case | Behaviour |
 |---|---|
 | Missing bank record for a date | Flagged as NO RECORD, running balance carries forward, reconciliation continues |
-| Discrepancy that self-corrects | Shows MISMATCH while the gap is open; Change column returns to $0.00 when resolved |
-| Discrepancy that persists unchanged | Continues to show MISMATCH with Change of $0.00 each day |
-| Discrepancy that changes amount mid-period | New MISMATCH with a non-zero Change on the day the amount shifts |
+| Discrepancy that self-corrects | Shows MISMATCH while the gap is open; returns to OK once resolved |
+| Discrepancy that persists unchanged | Continues to show MISMATCH with the same discrepancy amount each day |
+| Discrepancy that changes amount mid-period | Continues as MISMATCH; the Discrepancy column reflects the updated gap amount |
 | Discrepancy returning to zero | Excluded from the discrepancy report — zero means clean |
 | Negative running balance | Handled correctly — compared against bank balance as-is |
 

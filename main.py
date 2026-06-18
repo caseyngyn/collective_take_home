@@ -45,7 +45,7 @@ def reconcile_data(tx_text, bank_text):
     prev_discrepancy = 0.0
     final_bank_balance = None
     rows = []
-    discrepancies = []
+    discrepancy_log = []
 
     for d in all_dates:
         running_balance += totals.get(d, 0.0)
@@ -53,16 +53,15 @@ def reconcile_data(tx_text, bank_text):
 
         # date exists in transactions but not in bank — flag and continue
         if bank_balance is None:
-            rows.append({"date": d, "running": running_balance, "bank": None, "status": "NO_RECORD", "discrepancy": None, "delta": None})
+            rows.append({"date": d, "running": running_balance, "bank": None, "status": "NO_RECORD", "discrepancy": None})
             continue
 
         final_bank_balance = bank_balance
         discrepancy = round(running_balance - bank_balance, 2)
-        delta = round(discrepancy - prev_discrepancy, 2)
 
         # log when a non-zero discrepancy appears or changes — zero means clean, not a discrepancy
         if discrepancy != 0 and discrepancy != prev_discrepancy:
-            discrepancies.append({"date": d, "discrepancy": discrepancy})
+            discrepancy_log.append({"date": d, "discrepancy": discrepancy})
 
         prev_discrepancy = discrepancy
 
@@ -78,7 +77,7 @@ def reconcile_data(tx_text, bank_text):
             all_match = False
             last_discrepancy = discrepancy
 
-        rows.append({"date": d, "running": running_balance, "bank": bank_balance, "status": status, "discrepancy": discrepancy, "delta": delta})
+        rows.append({"date": d, "running": running_balance, "bank": bank_balance, "status": status, "discrepancy": discrepancy})
 
     net_discrepancy = round(running_balance - final_bank_balance, 2) if final_bank_balance is not None else None
 
@@ -91,6 +90,6 @@ def reconcile_data(tx_text, bank_text):
             "final_running_balance": running_balance,
             "final_bank_balance": final_bank_balance,
             "net_discrepancy": net_discrepancy,
-            "discrepancies": discrepancies,
+            "discrepancies": discrepancy_log,
         },
     }
