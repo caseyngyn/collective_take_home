@@ -13,11 +13,15 @@ def clean_number(value):
 def reconcile_data(tx_text, bank_text):
     # sum amounts per date so duplicate transaction dates are combined
     totals = defaultdict(float)
-    for row in csv.DictReader(io.StringIO(tx_text)):
+    tx_reader = csv.DictReader(io.StringIO(tx_text))
+    tx_reader.fieldnames = [f.strip() for f in tx_reader.fieldnames]
+    for row in tx_reader:
         totals[row["date"].strip()] += clean_number(row["amount"])
 
     bank = {}
-    for row in csv.DictReader(io.StringIO(bank_text)):
+    bk_reader = csv.DictReader(io.StringIO(bank_text))
+    bk_reader.fieldnames = [f.strip() for f in bk_reader.fieldnames]
+    for row in bk_reader:
         date = row["date"].strip()
         # duplicate dates in bank balances are a data error — reject immediately
         if date in bank:

@@ -1,121 +1,212 @@
-# Balance Reconciler
+# Balance Reconciliation Tool
 
-Checks whether daily bank balances match the running total of transactions.
+A browser-based tool that compares a running transaction ledger against daily bank balances and produces a color-coded day-by-day reconciliation report. Upload two CSV files, click Reconcile, and immediately see which days match, which don't, and by how much.
 
-## How It Works (`main.py`)
+---
 
-`reconcile_data(tx_text, bank_text)` is the core function. It takes the raw CSV content of both files as strings and returns a structured result.
+## How It Works
 
-**1. Clean and parse transactions**
-Each row's date and amount are stripped of whitespace and currency symbols. Amounts on the same date are summed together, so duplicate dates are collapsed into one total per day.
+The tool has three layers:
 
-**2. Clean and parse bank balances**
-Each row is loaded into a date-keyed dictionary. If the same date appears twice, an error is raised immediately — a bank statement should never have two balances for the same day.
+**`main.py` — reconciliation engine**
+Reads both CSVs, sums all transaction amounts per date into a running balance, then compares that running balance against the bank's reported balance for each date. It returns a structured result containing a row for every date, a summary, and a list of the specific dates where discrepancies first appeared or changed.
 
-**3. Opening balance check**
-Before any comparison, the very first date is checked. If the transaction total on day one does not match the bank balance on day one, a warning is shown but reconciliation continues — the accountant can see the full picture and judge whether it's a prior period issue.
+**`server.py` — Flask backend**
+Serves the single-page UI and exposes three endpoints:
+- `POST /reconcile` — accepts the two uploaded files, runs the engine, returns JSON
+- `POST /download/csv` — renders the result as a downloadable CSV report
+- `POST /download/html` — renders the result as a downloadable styled HTML report
 
-**4. Day-by-day comparison**
-All dates from both files are merged and sorted. For each date the function accumulates a running balance from transactions and compares it against the bank's reported balance for that day:
-- **OK** — running balance matches the bank
-- **NO RECORD** — no bank entry for this date; running balance carries forward
-- **MISMATCH** — discrepancy detected or the discrepancy amount changed from the previous day
+**HTML/JS frontend (embedded in `server.py`)**
+All UI lives in a single HTML string served by Flask. No build step, no external dependencies. The browser sends files to `/reconcile`, receives JSON, and renders the results client-side. Downloads trigger a form POST so the browser handles the file save natively.
 
-**5. Discrepancy log**
-After the row-by-row pass, a separate list records every date where a non-zero discrepancy first appeared or changed. Dates where the discrepancy returned to zero are excluded — zero means clean and does not belong in a discrepancy report.
-
-**6. Summary**
-Returns the final running balance, the final bank balance, the net discrepancy, and the discrepancy log — everything the UI needs to render the report.
+---
 
 ## Setup
+
+**Requirements:** Python 3.8+, Flask
+
+Install Flask if you don't already have it:
 
 ```bash
 pip install flask
 ```
 
-## Run
+No other packages are required. The reconciliation engine (`main.py`) uses only the Python standard library.
+
+---
+
+## How to Run
 
 ```bash
 python server.py
 ```
 
-Then open [http://127.0.0.1:5000](http://127.0.0.1:5000) in your browser.
+Then open your browser to:
 
-## Usage
+```
+http://localhost:5000
+```
 
-1. Drop in your **transactions CSV** — must have `date` and `amount` columns. Duplicate dates are automatically combined.
-2. Drop in your **bank balances CSV** — must have `date` and `balance` columns.
-3. Click **Reconcile**.
+The server runs in debug mode on port 5000 by default.
 
-### Report sections
+---
 
-**Summary cards** — Final running balance, final bank balance, and net discrepancy at a glance.
+## How to Use
 
-**Discrepancy Report** — A concise table showing every date a non-zero discrepancy appeared or changed, with the discrepancy amount. Resolutions back to zero are excluded.
+1. **Drop or browse** your `transactions.csv` into the left upload zone.
+2. **Drop or browse** your `bank_balances.csv` into the right upload zone.
+3. The **Reconcile** button activates once both files are loaded — click it.
+4. Results appear immediately below:
+   - A **summary banner** (green = all clear, red = discrepancies found)
+   - A **day-by-day table** with color-coded rows
+5. Use **Download CSV** or **Download HTML** to save a report. Both filenames are timestamped, e.g. `reconciliation_20260618_143022.csv`.
 
-**Day-by-Day Statement** — Full row-by-row breakdown (hidden by default, toggle with View Statement):
-- **Green (OK)** — running balance matches the bank
-- **Red (MISMATCH)** — running balance does not match the bank; the Discrepancy column shows the gap
-- **Yellow (NO RECORD)** — date has a transaction but no corresponding bank entry
+You can re-upload different files and click Reconcile again without refreshing — results replace the previous run.
 
-### Downloading
-
-Click **Download Statement** to export a timestamped CSV containing both the reconciliation statement and the discrepancy report. The filename includes the date and time the report was generated (e.g. `reconciliation_statement_06-18-2026-14-32-05.csv`) so every download is uniquely identifiable.
+---
 
 ## CSV Format
 
-**transactions.csv**
-```
+### `transactions.csv`
+
+One row per transaction. Multiple transactions on the same date are allowed and will be summed together.
+
+| Column | Required | Description |
+|--------|----------|-------------|
+| `date` | Yes | Date of the transaction |
+| `amount` | Yes | Transaction amount (positive = credit, negative = debit) |
+
+```csv
 date,amount
-2025-06-01,1000.00
-2025-06-02,-50.00
+2024-01-01,1000.00
+2024-01-02,250.00
+2024-01-02,-75.00
+2024-01-03,-200.00
 ```
 
-**bank_balances.csv**
-```
+### `bank_balances.csv`
+
+One row per date representing the bank's end-of-day balance. Each date must be unique — duplicate dates are treated as a data error and the upload will be rejected.
+
+| Column | Required | Description |
+|--------|----------|-------------|
+| `date` | Yes | Date of the balance snapshot |
+| `balance` | Yes | End-of-day balance reported by the bank |
+
+```csv
 date,balance
-2025-06-01,1000.00
-2025-06-02,950.00
+2024-01-01,1000.00
+2024-01-02,1175.00
+2024-01-03,975.00
 ```
+
+### Accepted number formats
+
+The parser strips currency symbols and formatting before converting, so all of these are valid in either file:
+
+```
+1000
+1000.00
+1,000.00
+$1,000.00
+£1,000.00
+€1,000.00
+-250.50
+-$250.50
+$-250.50
+```
+
+Column headers are also whitespace-tolerant — `" date "` and `"date"` are treated identically.
+
+### Date format
+
+Dates are compared as strings after stripping whitespace. As long as both files use the same date format consistently, any format works (`2024-01-15`, `01/15/2024`, `Jan 15 2024`, etc.). The tool sorts dates lexicographically, so `YYYY-MM-DD` is strongly recommended for correct ordering.
+
+---
+
+## Understanding the Report
+
+### Summary banner
+
+Appears at the top of the results.
+
+| Field | Description |
+|-------|-------------|
+| Final Running Balance | Sum of all transaction amounts across all dates |
+| Final Bank Balance | The bank's balance on the last date that appears in the bank file |
+| Net Discrepancy | Final Running Balance minus Final Bank Balance |
+| Days Reviewed | Total number of distinct dates across both files |
+| Days with Mismatch | Number of dates where a new or changed discrepancy was first detected |
+
+If discrepancies exist, each affected date is listed as a pill below the stats, showing the discrepancy amount at that point in time.
+
+A **yellow warning** appears when the very first date's running total doesn't match the bank's opening balance. This usually means there are transactions from a prior period that aren't included in the uploaded file. All subsequent rows may be offset by that opening gap.
+
+### Day-by-day table
+
+Each row represents one calendar date. Rows are sorted chronologically.
+
+| Column | Description |
+|--------|-------------|
+| Date | The date |
+| Running Balance | Cumulative sum of all transactions up to and including this date |
+| Bank Balance | The bank's reported balance on this date (`—` if no bank record exists) |
+| Discrepancy | Running Balance minus Bank Balance (`—` if no bank record) |
+| Status | Match, Mismatch, or No Record (see below) |
+
+**Row colors:**
+
+| Color | Status | Meaning |
+|-------|--------|---------|
+| Green | Match | Running balance equals the bank balance exactly |
+| Red | Mismatch | Running balance and bank balance differ |
+| Grey | No Record | Date appears in transactions but has no corresponding bank entry |
+
+### Downloaded reports
+
+Both formats include the full summary and the day-by-day table. The HTML download is a self-contained file with inline styles — open it in any browser without needing the server running. The CSV download is structured with a summary section followed by the full row-level data, suitable for opening in Excel or any spreadsheet tool.
+
+---
 
 ## Edge Cases Covered
 
-### Data Quality
-| Case | Behaviour |
-|---|---|
-| Duplicate dates in transactions | Amounts are summed into a single entry before reconciling |
-| Duplicate dates in bank balances | Rejected as a data error — bank statements should not have two balances for the same day |
-| Opening balance mismatch | Warning shown above the report; reconciliation continues so the full period is still visible |
-| Whitespace in values | Stripped from dates and amounts before parsing |
-| Currency symbols (`$` `£` `€` `¥` `₹` `₩` `₪`) | Stripped before converting to a number |
-| Comma-formatted numbers (`$1,000.00`) | Commas removed — values must be quoted in the CSV (`"$1,000.00"`) since unquoted commas are treated as column separators |
+| Scenario | Behavior |
+|----------|----------|
+| Multiple transactions on the same date | All amounts for that date are summed before comparing to the bank |
+| Duplicate date in bank file | Rejected immediately with an error message naming the offending date |
+| Date in transactions with no matching bank entry | Row status is `NO_RECORD`; running balance continues to accumulate; not counted as a mismatch |
+| Negative running balance (overdraft) | Handled normally — compared against the bank balance as-is |
+| Opening balance mismatch | A yellow warning is shown; the gap typically carries forward through all subsequent rows |
+| Currency symbols in amounts | Stripped before parsing (`$`, `£`, `€`, `¥`, `₹`, `₩`, `₪`, etc.) |
+| Comma-formatted numbers | Commas removed before parsing (`$1,500.00` → `1500.00`) |
+| Whitespace around values or headers | Stripped from column names and all cell values before processing |
+| BOM in UTF-8 files (Excel exports) | Handled automatically — files are decoded as `utf-8-sig` |
 
-### Reconciliation Logic
-| Case | Behaviour |
-|---|---|
-| Missing bank record for a date | Flagged as NO RECORD, running balance carries forward, reconciliation continues |
-| Discrepancy that self-corrects | Shows MISMATCH while the gap is open; returns to OK once resolved |
-| Discrepancy that persists unchanged | Continues to show MISMATCH with the same discrepancy amount each day |
-| Discrepancy that changes amount mid-period | Continues as MISMATCH; the Discrepancy column reflects the updated gap amount |
-| Discrepancy returning to zero | Excluded from the discrepancy report — zero means clean |
-| Negative running balance | Handled correctly — compared against bank balance as-is |
+---
 
-## Running Tests
+## Running the Tests
 
 ```bash
-python run_tests.py
+pip install pytest
+python -m pytest test_reconcile.py -v
 ```
 
-### Test Cases
-| Test | What it covers |
-|---|---|
-| `all_match` | Happy path — all dates reconcile |
-| `mismatch` | Single discrepancy that self-resolves |
-| `diverge` | Discrepancy that carries forward unresolved |
-| `complex_discrepancies` | Multi-discrepancy scenario: timing difference, persistent gap, changing gap, missing bank record |
-| `duplicate_dates` | Duplicate transaction dates combined before comparison |
-| `duplicate_bank_dates` | Duplicate bank dates rejected with error |
-| `opening_mismatch` | Mismatched day-one balance shows warning and continues |
-| `no_bank_record` | Missing bank entry handled gracefully |
-| `negative_balance` | Running balance goes negative |
-| `dirty_data` | Mixed currency symbols, whitespace, comma-formatted numbers |
+26 tests across 7 scenarios. All test the core reconciliation engine in `main.py` directly, independent of Flask.
+
+---
+
+## Assumptions
+
+- **The running balance starts at zero.** There is no concept of a prior-period carried balance. The running balance is built entirely from the transactions provided. If your export starts mid-period, the opening mismatch warning will fire and all rows may show a consistent offset equal to whatever was missing from before the export window.
+
+- **Dates are sorted lexicographically.** The tool does not parse or validate date formats — it compares them as strings and sorts them with Python's default string sort. `YYYY-MM-DD` is the only format that guarantees correct chronological ordering.
+
+- **Duplicate transaction dates are intentional and valid.** It is normal to have multiple transactions in one day. Duplicate bank dates are treated as a data error because each bank entry represents a single end-of-day snapshot.
+
+- **A discrepancy that persists unchanged across multiple days counts as one discrepancy event, not one per day.** The mismatch count and discrepancy log record the date a new gap appears or an existing gap changes amount — not every day the gap exists. This keeps the summary focused on where something went wrong, not how long it lingered.
+
+- **No bank record is not the same as a mismatch.** If a date exists in transactions but not in the bank file, the tool flags it as `NO_RECORD` and skips it for match/mismatch counting. This is intentional — the bank simply may not report a balance every single day (weekends, holidays, etc.).
+
+- **The discrepancy column shows running balance minus bank balance.** A positive discrepancy means the ledger is higher than the bank; a negative discrepancy means the bank is higher than the ledger.
+
