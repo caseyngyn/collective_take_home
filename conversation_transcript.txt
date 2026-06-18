@@ -1,0 +1,167 @@
+================================================================================
+CONVERSATION TRANSCRIPT
+Take-Home Project — Balance Reconciliation Tool
+Date: June 18, 2026
+================================================================================
+
+
+────────────────────────────────────────────────────────────────────────────────
+USER
+────────────────────────────────────────────────────────────────────────────────
+
+Create a simple UI where users will drop in their transactions.csv and
+bank_balances.csv. Output: a summary of days of discrepancies, a report of day
+to day statement logs of running balance vs bank. Include a download option to
+download the report and summary. The downloaded file should be timestamped.
+Matching running balance will highlight green. Mismatch will highlight red.
+Use flask to make a small backend server and use html to create the front end.
+
+
+────────────────────────────────────────────────────────────────────────────────
+ASSISTANT
+────────────────────────────────────────────────────────────────────────────────
+
+Built a Flask backend + HTML frontend, saved as server.py.
+
+Files created:
+  - server.py (Flask server + embedded HTML frontend)
+
+Features implemented:
+  - Drag-and-drop (or click-to-browse) file upload for transactions.csv and
+    bank_balances.csv
+  - Reconcile button (disabled until both files are loaded)
+  - Summary banner:
+      • Green banner when all balances match
+      • Red banner with discrepancy count when mismatches exist
+      • Stat boxes: Final Running Balance, Final Bank Balance, Net Discrepancy,
+        Days Reviewed, Days with Mismatch
+      • List of specific discrepancy dates with amounts
+      • Opening balance warning box (yellow) when applicable
+  - Day-by-day statement log table:
+      • Green row = Match (running balance == bank balance)
+      • Red row = Mismatch
+      • Grey row = No bank record for that date
+      • Columns: Date, Running Balance, Bank Balance, Discrepancy, Status badge
+  - Download buttons:
+      • "Download CSV" — exports summary + full report as a CSV
+      • "Download HTML" — exports a styled, self-contained HTML report
+      • Both filenames are timestamped (e.g. reconciliation_20260618_143022.csv)
+
+Run with:
+  python server.py
+  Open http://localhost:5000
+
+────────────────────────────────────────────────────────────────────────────────
+USER
+────────────────────────────────────────────────────────────────────────────────
+
+Write me up test cases: a complex statement, dirty data (where the inputs are
+strings or have whitespace), duplicate bank dates, duplicate transaction dates,
+negative balance, no bank record, and if the opening balance was mismatched.
+
+
+────────────────────────────────────────────────────────────────────────────────
+ASSISTANT
+────────────────────────────────────────────────────────────────────────────────
+
+Wrote 26 tests across 7 classes in test_reconcile.py.
+
+  Test class breakdown:
+
+  TestComplexStatement (4 tests)
+    - test_row_count
+        Multi-day ledger with 5 rows; verifies correct number of output rows.
+    - test_all_ok_days
+        4-day ledger where every running balance matches bank; all_match = True.
+    - test_mismatch_detected
+        Day 5 running balance diverges from bank; status = MISMATCH, correct
+        discrepancy value (-50.0).
+    - test_summary_final_balances
+        Verifies summary fields: final_running_balance, final_bank_balance,
+        net_discrepancy.
+
+  TestDirtyData (4 tests)
+    - test_dollar_signs_and_commas
+        Amounts formatted as "$1,500.00" and "$-200.00"; symbols and commas
+        stripped, reconciliation succeeds.
+    - test_whitespace_around_values
+        Column headers like "date , amount" with surrounding spaces; verifies
+        parsing succeeds after header stripping.
+    - test_mixed_currency_symbols
+        Euro (€) and pound (£) symbols stripped; reconciliation succeeds.
+    - test_negative_with_symbol
+        Amount formatted as "-$250.50"; verifies correct signed parse.
+
+  TestDuplicateBankDates (2 tests)
+    - test_raises_value_error
+        Bank CSV with the same date twice must raise ValueError immediately.
+    - test_error_message_includes_date
+        The ValueError message must name the offending date.
+
+  TestDuplicateTransactionDates (3 tests)
+    - test_same_day_amounts_are_summed
+        Three rows on the same date sum to 600; bank shows 600; match.
+    - test_multi_day_with_duplicates
+        Two days each with duplicate rows; running balance accumulates correctly.
+    - test_duplicate_tx_mismatch_still_detected
+        Duplicate rows sum to 800; bank shows 750; discrepancy = 50.
+
+  TestNegativeBalance (3 tests)
+    - test_overdraft_matches_bank
+        Running balance goes to -400; bank also shows -400; match.
+    - test_overdraft_mismatch
+        Running = -400, bank = -350; discrepancy = -50.
+    - test_recovery_from_negative
+        Balance dips to -300 then recovers to 500; all three rows match.
+
+  TestNoBankRecord (4 tests)
+    - test_status_is_no_record
+        Date in transactions but missing from bank CSV → status = NO_RECORD,
+        bank field = None.
+    - test_no_record_does_not_count_as_mismatch
+        A NO_RECORD row does not flip all_match to False.
+    - test_running_balance_still_accumulates
+        Running balance continues accumulating through NO_RECORD days; next
+        bank record reconciles correctly.
+    - test_multiple_missing_bank_dates
+        Three tx dates, only one bank date; statuses = [OK, NO_RECORD,
+        NO_RECORD].
+
+  TestOpeningBalanceMismatch (6 tests)
+    - test_warning_is_set
+        Day-1 tx total (1000) ≠ day-1 bank (900); warning field is not None.
+    - test_warning_contains_date
+        Warning string includes the first date.
+    - test_warning_mentions_both_values
+        Warning string includes both the tx value and bank value.
+    - test_no_warning_when_opening_matches
+        Clean opening → warning = None.
+    - test_mismatch_status_still_recorded
+        Opening mismatch → day-1 row status = MISMATCH, discrepancy = 100.
+    - test_downstream_rows_inherit_prior_error
+        The 100-unit gap from day 1 carries forward to day 2 discrepancy.
+
+  Result: 26/26 passed.
+
+  ── Bugs found and fixed during test authoring ──────────────────────────────
+
+  Bug 1 — main.py (real bug):
+    csv.DictReader did not strip whitespace from column headers. A file with
+    headers like "date , amount" would produce KeyError: 'date' when the code
+    tried to access row["date"]. Fixed by explicitly stripping fieldnames before
+    iterating:
+
+      reader = csv.DictReader(io.StringIO(tx_text))
+      reader.fieldnames = [f.strip() for f in reader.fieldnames]
+
+  Bug 2 — test helpers (test infrastructure bug):
+    The tx() and bk() helper functions naively joined values with commas.
+    Amounts like "$1,500.00" contain a comma, so the CSV parser split them into
+    extra columns (amount became "$1" instead of "$1,500.00"). Fixed by using
+    csv.writer to build the CSV strings, which auto-quotes fields that contain
+    commas.
+
+
+================================================================================
+END OF TRANSCRIPT
+================================================================================
