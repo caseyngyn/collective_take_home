@@ -260,8 +260,7 @@ HTML = r"""
     <div class="report-header">
       <h2>Day-by-Day Statement Log</h2>
       <div class="btn-row">
-        <button class="btn btn-outline" onclick="download('csv')">⬇ Download CSV</button>
-        <button class="btn btn-outline" onclick="download('html')">⬇ Download HTML</button>
+        <button class="btn btn-outline" onclick="download()">⬇ Download CSV</button>
       </div>
     </div>
     <div class="table-wrap">
@@ -371,7 +370,8 @@ function fmt(n) {
 }
 
 function renderResults(data) {
-  const { rows, all_match, mismatch_count, warning, summary } = data;
+  const { rows, mismatch_count, warning, summary } = data;
+  const all_match = mismatch_count === 0;
 
   /* Summary banner */
   const banner = document.getElementById('summaryBanner');
@@ -440,9 +440,9 @@ function renderResults(data) {
 }
 
 /* ── Download ── */
-function download(type) {
+function download() {
   if (!lastResult) return;
-  const url = type === 'csv' ? '/download/csv' : '/download/html';
+  const url = '/download/csv';
   const form = document.createElement('form');
   form.method = 'POST';
   form.action = url;
@@ -485,10 +485,13 @@ def reconcile():
 
 @app.route("/download/csv", methods=["POST"])
 def download_csv():
-    data = json.loads(request.form["data"])
+    try:
+        data = json.loads(request.form["data"])
+        rows = data["rows"]
+        summary = data["summary"]
+    except (KeyError, json.JSONDecodeError) as e:
+        return jsonify({"error": f"Invalid download payload: {e}"}), 400
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    rows = data["rows"]
-    summary = data["summary"]
 
     buf = io.StringIO()
     w = csv.writer(buf)
@@ -522,129 +525,6 @@ def download_csv():
         mimetype="text/csv",
         as_attachment=True,
         download_name=f"reconciliation_{ts}.csv",
-    )
-
-
-@app.route("/download/html", methods=["POST"])
-def download_html():
-    data = json.loads(request.form["data"])
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    ts_display = datetime.now().strftime("%B %d, %Y %I:%M %p")
-    rows = data["rows"]
-    summary = data["summary"]
-    all_match = data["all_match"]
-    mismatch_count = data["mismatch_count"]
-    warning = data.get("warning")
-
-    def fmt(n):
-        if n is None:
-            return "—"
-        return f"${n:,.2f}"
-
-    disc_rows = ""
-    for d in summary["discrepancies"]:
-        disc_rows += f"<tr><td>{d['date']}</td><td>{fmt(d['discrepancy'])}</td></tr>"
-
-    def row_color(status):
-        return {"OK": "#f0fdf4", "MISMATCH": "#fff5f5", "NO_RECORD": "#fafafa"}.get(status, "#fff")
-
-    def badge(status):
-        if status == "OK":
-            return '<span style="background:#dcfce7;color:#15803d;padding:2px 9px;border-radius:20px;font-size:.75rem;font-weight:700">Match</span>'
-        if status == "NO_RECORD":
-            return '<span style="background:#f3f4f6;color:#6b7280;padding:2px 9px;border-radius:20px;font-size:.75rem;font-weight:700">No Record</span>'
-        return '<span style="background:#fee2e2;color:#b91c1c;padding:2px 9px;border-radius:20px;font-size:.75rem;font-weight:700">Mismatch</span>'
-
-    table_rows = ""
-    for r in rows:
-        bg = row_color(r["status"])
-        table_rows += f"""
-        <tr style="background:{bg}">
-          <td>{r['date']}</td>
-          <td style="text-align:right">{fmt(r['running'])}</td>
-          <td style="text-align:right">{fmt(r['bank'])}</td>
-          <td style="text-align:right">{fmt(r['discrepancy'])}</td>
-          <td>{badge(r['status'])}</td>
-        </tr>"""
-
-    status_color = "#15803d" if all_match else "#b91c1c"
-    status_bg    = "#f0fdf4" if all_match else "#fff5f5"
-    status_border = "#22c55e" if all_match else "#ef4444"
-    status_text  = "✓ All balances match" if all_match else f"✗ {mismatch_count} discrepanc{'y' if mismatch_count == 1 else 'ies'} detected"
-
-    disc_section = ""
-    if summary["discrepancies"]:
-        disc_section = f"""
-        <h3 style="margin:20px 0 8px;font-size:.9rem;color:#b91c1c">Days with Discrepancies</h3>
-        <table style="border-collapse:collapse;font-size:.85rem;margin-bottom:16px">
-          <thead><tr>
-            <th style="background:#1a1a2e;color:#e5e7eb;padding:8px 14px;text-align:left">Date</th>
-            <th style="background:#1a1a2e;color:#e5e7eb;padding:8px 14px;text-align:right">Discrepancy</th>
-          </tr></thead>
-          <tbody>{disc_rows}</tbody>
-        </table>"""
-
-    warning_section = ""
-    if warning:
-        warning_section = f'<div style="background:#fffbeb;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;font-size:.82rem;color:#92400e;margin-top:12px">⚠ {warning}</div>'
-
-    html = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <title>Reconciliation Report {ts}</title>
-  <style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color:#1a1a2e; max-width:900px; margin:40px auto; padding:0 20px; }}
-    h1   {{ font-size:1.5rem; }} h2 {{ font-size:1.1rem; margin:24px 0 12px; }}
-    table {{ border-collapse:collapse; width:100%; font-size:.88rem; }}
-    th {{ background:#1a1a2e; color:#e5e7eb; padding:10px 14px; text-align:left; font-size:.78rem; text-transform:uppercase; letter-spacing:.6px; }}
-    td {{ padding:9px 14px; border-bottom:1px solid #f0f2f5; }}
-    .stat {{ display:inline-block; background:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:10px 18px; margin:6px 6px 6px 0; min-width:160px; }}
-    .stat-l {{ font-size:.72rem; text-transform:uppercase; letter-spacing:.5px; color:#6b7280; }}
-    .stat-v {{ font-size:1.1rem; font-weight:700; margin-top:3px; }}
-  </style>
-</head>
-<body>
-  <h1>Balance Reconciliation Report</h1>
-  <p style="color:#6b7280;font-size:.85rem;margin-top:4px">Generated: {ts_display}</p>
-
-  <div style="background:{status_bg};border-left:5px solid {status_border};border-radius:8px;padding:14px 20px;margin:20px 0">
-    <strong style="color:{status_color};font-size:1rem">{status_text}</strong>
-  </div>
-
-  <h2>Summary</h2>
-  <div>
-    <div class="stat"><div class="stat-l">Final Running Balance</div><div class="stat-v">{fmt(summary['final_running_balance'])}</div></div>
-    <div class="stat"><div class="stat-l">Final Bank Balance</div><div class="stat-v">{fmt(summary['final_bank_balance'])}</div></div>
-    <div class="stat"><div class="stat-l">Net Discrepancy</div><div class="stat-v">{fmt(summary['net_discrepancy'])}</div></div>
-    <div class="stat"><div class="stat-l">Days Reviewed</div><div class="stat-v">{len(rows)}</div></div>
-    <div class="stat"><div class="stat-l">Discrepancy Dates</div><div class="stat-v">{len(summary['discrepancies'])}</div></div>
-  </div>
-
-  {disc_section}
-  {warning_section}
-
-  <h2>Day-by-Day Statement Log</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th style="text-align:right">Running Balance</th>
-        <th style="text-align:right">Bank Balance</th>
-        <th style="text-align:right">Discrepancy</th>
-        <th>Status</th>
-      </tr>
-    </thead>
-    <tbody>{table_rows}</tbody>
-  </table>
-</body>
-</html>"""
-
-    return send_file(
-        io.BytesIO(html.encode("utf-8")),
-        mimetype="text/html",
-        as_attachment=True,
-        download_name=f"reconciliation_{ts}.html",
     )
 
 

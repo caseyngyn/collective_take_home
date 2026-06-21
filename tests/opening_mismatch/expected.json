@@ -15,7 +15,6 @@
       "discrepancy": -100.0
     }
   ],
-  "all_match": false,
   "mismatch_count": 1,
   "warning": "Opening balance mismatch on 2025-01-01: transactions show 500.00, bank shows 600.00. Results may be affected by a prior period issue.",
   "summary": {

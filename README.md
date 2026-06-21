@@ -176,11 +176,21 @@ Both formats include the full summary and the day-by-day table. The HTML downloa
 | Multiple transactions on the same date | All amounts for that date are summed before comparing to the bank |
 | Duplicate date in bank file | Rejected immediately with an error message naming the offending date |
 | Date in transactions with no matching bank entry | Row status is `NO_RECORD`; running balance continues to accumulate; not counted as a mismatch |
-| Negative running balance (overdraft) | Handled normally — compared against the bank balance as-is |
+| Date in bank with no matching transactions | Running balance carries forward unchanged; compared against the bank balance as normal |
+| Negative running balance (overdraft) | Handled normally — compared against the bank balance as-is; recovers correctly if balance goes positive again |
 | Opening balance mismatch | A yellow warning is shown; the gap typically carries forward through all subsequent rows |
+| Discrepancy that resolves then re-appears | Counts as two distinct mismatch events, not one |
+| Discrepancy that changes value without resolving | Each change in gap amount increments the mismatch count and adds a new entry to the discrepancy log |
+| Persistent same-gap across multiple days | Counted as one mismatch event regardless of how many days it spans |
 | Currency symbols in amounts | Stripped before parsing (`$`, `£`, `€`, `¥`, `₹`, `₩`, `₪`, etc.) |
 | Comma-formatted numbers | Commas removed before parsing (`$1,500.00` → `1500.00`) |
 | Whitespace around values or headers | Stripped from column names and all cell values before processing |
+| Negative amounts prefixed with `-` | Parsed correctly as negative (`-$250.50`, `$-250.50`) |
+| Zero-amount transactions | Treated as valid no-ops; running balance is unaffected |
+| Unsorted input rows | Both CSVs are sorted chronologically internally; row order in the input files does not matter |
+| Empty CSVs (headers only, no data rows) | Returns a clean empty result with no rows, no mismatches, and no crash |
+| No bank records at all | All transaction dates marked `NO_RECORD`; `net_discrepancy` is `None`; `all_match` remains `True` |
+| Floating point accumulation | Discrepancy is rounded to two decimal places at comparison time, absorbing minor float drift |
 | BOM in UTF-8 files (Excel exports) | Handled automatically — files are decoded as `utf-8-sig` |
 
 ---
@@ -192,7 +202,7 @@ pip install pytest
 python -m pytest test_reconcile.py -v
 ```
 
-26 tests across 7 scenarios. All test the core reconciliation engine in `main.py` directly, independent of Flask.
+49 tests across 15 scenarios. All test the core reconciliation engine in `main.py` directly, independent of Flask.
 
 ---
 
@@ -209,4 +219,10 @@ python -m pytest test_reconcile.py -v
 - **No bank record is not the same as a mismatch.** If a date exists in transactions but not in the bank file, the tool flags it as `NO_RECORD` and skips it for match/mismatch counting. This is intentional — the bank simply may not report a balance every single day (weekends, holidays, etc.).
 
 - **The discrepancy column shows running balance minus bank balance.** A positive discrepancy means the ledger is higher than the bank; a negative discrepancy means the bank is higher than the ledger.
+
+- **The tool is tolerant of imperfect CSV formatting.** Real-world exports from accounting software, banks, and spreadsheets are not always consistent. Column headers may have surrounding whitespace. Amount fields may include currency symbols (`$`, `£`, `€`, etc.), thousands separators (`,`), and mixed formatting. The tool strips all of this before parsing so that files from different sources can be compared without manual cleanup. If an amount cell cannot be reduced to a valid number after cleaning, the row is rejected with an error identifying the offending date and value.
+
+- **Negatives are denoted with a leading minus sign (`-`).** Accounting notation using parentheses for negatives — e.g. `(250.00)` — is not supported. Amounts must use `-250.00` or `-$250.00` format.
+
+- **CSV files must have a header row.** A completely empty file (no headers, no data) is rejected. A file with only a header row and no data rows is valid and produces an empty result.
 
