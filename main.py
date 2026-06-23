@@ -5,13 +5,19 @@ from collections import defaultdict
 from typing import Any
 
 
-def clean_number(value: str) -> float:
+def _clean_number(value: str) -> float:
     # strips whitespace, currency symbols ($£€¥₹₩₪ etc), and commas from formatted numbers
+    # supports: leading minus (-250.00), accounting parens ((250.00)), trailing minus (250.00-)
     # params: value (str) — raw cell value from CSV
     # returns: float
-    cleaned = re.sub(r'[^\d.\-]', '', value.strip())
-    if not cleaned or cleaned in ('.', '-'):
-        raise ValueError(f"Cannot parse amount from value: {value!r}")
+    stripped = value.strip()
+    # edge case: accounting parens mean negative: (250.00) → -250.00
+    if stripped.startswith('(') and stripped.endswith(')'):
+        stripped = '-' + stripped[1:-1]
+    cleaned = re.sub(r'[^\d.\-]', '', stripped)
+    # edge case: trailing minus means negative: 250.00- → -250.00
+    if cleaned.endswith('-') and not cleaned.startswith('-'):
+        cleaned = '-' + cleaned[:-1]
     try:
         return float(cleaned)
     except ValueError:
@@ -24,9 +30,13 @@ def _make_reader(text: str) -> csv.DictReader:
     # returns: csv.DictReader ready to iterate
     # raises: ValueError if the CSV has no header row
     reader = csv.DictReader(io.StringIO(text))
+    # user uploaded empty file
     if reader.fieldnames is None:
         raise ValueError("CSV has no header row")
     reader.fieldnames = [f.strip() for f in reader.fieldnames]
+    # after stripping, headers could all be blank (e.g. a row of just commas)
+    if not any(reader.fieldnames):
+        raise ValueError("CSV has no header row")
     return reader
 
 
@@ -36,11 +46,16 @@ def _parse_totals(tx_text: str) -> defaultdict[str, float]:
     # returns: defaultdict(float) keyed by date string, value is net amount for that date
     totals: defaultdict[str, float] = defaultdict(float)
     for row in _make_reader(tx_text):
-        date = row["date"].strip()
         try:
-            totals[date] += clean_number(row["amount"])
-        except ValueError as e:
-            raise ValueError(f"Row {date}: {e}") from e
+            date = row["date"].strip()
+            # rejects placeholders like "N/A", "none", "-" that spreadsheets emit for missing dates —
+            # any real date format contains at least one digit
+            if not date or not any(c.isdigit() for c in date):
+                raise ValueError(f"invalid date value: {date!r}")
+            totals[date] += _clean_number(row["amount"])
+        except (ValueError, KeyError, AttributeError) as e:
+            # row.get('date') instead of date — date was never assigned if the KeyError was on row["date"]
+            raise ValueError(f"Row {(row.get('date') or '').strip() or 'unknown'}: {e}") from e
     return totals
 
 
@@ -51,13 +66,19 @@ def _parse_bank(bank_text: str) -> dict[str, float]:
     # raises: ValueError if the same date appears more than once
     bank: dict[str, float] = {}
     for row in _make_reader(bank_text):
-        date = row["date"].strip()
+        try:
+            date = row["date"].strip()
+            # rejects placeholders like "N/A", "none", "-" that spreadsheets emit for missing dates —
+            # any real date format contains at least one digit
+            if not date or not any(c.isdigit() for c in date):
+                raise ValueError(f"invalid date value: {date!r}")
+            balance = _clean_number(row["balance"])
+        except (ValueError, KeyError, AttributeError) as e:
+            # row.get('date') instead of date — date was never assigned if the KeyError was on row["date"]
+            raise ValueError(f"Row {(row.get('date') or '').strip() or 'unknown'}: {e}") from e
         if date in bank:
             raise ValueError(f"Duplicate date in bank balances: {date}")
-        try:
-            bank[date] = clean_number(row["balance"])
-        except ValueError as e:
-            raise ValueError(f"Row {date}: {e}") from e
+        bank[date] = balance
     return bank
 
 
@@ -89,12 +110,14 @@ def _classify(
     # returns: tuple of (status (str), new_open_discrepancy (float | None), new_mismatch_count (int))
     if discrepancy == 0:
         return "OK", None, mismatch_count
+    # same gap as the prior date — continuation, not a new event, so mismatch_count stays unchanged
     if discrepancy == open_discrepancy:
         return "MISMATCH", open_discrepancy, mismatch_count
     return "MISMATCH", discrepancy, mismatch_count + 1
 
 # main logic
 def reconcile_data(tx_text: str, bank_text: str) -> dict[str, Any]:
+    # guard against callers passing bytes or None (Flask file.read() returns bytes if not decoded)
     if not isinstance(tx_text, str) or not isinstance(bank_text, str):
         raise TypeError("tx_text and bank_text must be strings")
 
@@ -103,6 +126,7 @@ def reconcile_data(tx_text: str, bank_text: str) -> dict[str, Any]:
 
     all_dates = sorted(set(totals) | set(bank))
 
+    # both files had headers but no data rows
     if not all_dates:
         return {"rows": [], "mismatch_count": 0, "warning": None,
                 "summary": {"final_running_balance": 0.0, "final_bank_balance": None,
@@ -120,16 +144,20 @@ def reconcile_data(tx_text: str, bank_text: str) -> dict[str, Any]:
     discrepancy_log: list[dict[str, Any]] = []
 
     for d in all_dates:
+        # default 0.0 handles dates that appear only in the bank file — running balance carries forward
         running_balance += totals.get(d, 0.0)
         bank_balance = bank.get(d)
 
+        # date exists in transactions but not bank — not a mismatch, just no snapshot for that day
         if bank_balance is None:
             rows.append({"date": d, "running": running_balance, "bank": None, "status": "NO_RECORD", "discrepancy": None})
             continue
 
         final_bank_balance = bank_balance
+        # round to 2 decimals to absorb float accumulation drift across many additions
         discrepancy = round(running_balance - bank_balance, 2)
 
+        # only log when the gap appears or changes — prevents a persistent gap from creating an entry every day
         if discrepancy != 0 and discrepancy != last_seen_discrepancy:
             discrepancy_log.append({"date": d, "discrepancy": discrepancy})
         last_seen_discrepancy = discrepancy

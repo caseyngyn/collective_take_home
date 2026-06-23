@@ -15,7 +15,6 @@ Reads both CSVs, sums all transaction amounts per date into a running balance, t
 Serves the single-page UI and exposes three endpoints:
 - `POST /reconcile` — accepts the two uploaded files, runs the engine, returns JSON
 - `POST /download/csv` — renders the result as a downloadable CSV report
-- `POST /download/html` — renders the result as a downloadable styled HTML report
 
 **HTML/JS frontend (embedded in `server.py`)**
 All UI lives in a single HTML string served by Flask. No build step, no external dependencies. The browser sends files to `/reconcile`, receives JSON, and renders the results client-side. Downloads trigger a form POST so the browser handles the file save natively.
@@ -60,7 +59,7 @@ The server runs in debug mode on port 5000 by default.
 4. Results appear immediately below:
    - A **summary banner** (green = all clear, red = discrepancies found)
    - A **day-by-day table** with color-coded rows
-5. Use **Download CSV** or **Download HTML** to save a report. Both filenames are timestamped, e.g. `reconciliation_20260618_143022.csv`.
+5. Use **Download CSV** to save a report. The filename is timestamped, e.g. `reconciliation_20260618_143022.csv`.
 
 You can re-upload different files and click Reconcile again without refreshing — results replace the previous run.
 
@@ -115,6 +114,8 @@ $1,000.00
 -250.50
 -$250.50
 $-250.50
+(250.50)
+250.50-
 ```
 
 Column headers are also whitespace-tolerant — `" date "` and `"date"` are treated identically.
@@ -165,7 +166,7 @@ Each row represents one calendar date. Rows are sorted chronologically.
 
 ### Downloaded reports
 
-Both formats include the full summary and the day-by-day table. The HTML download is a self-contained file with inline styles — open it in any browser without needing the server running. The CSV download is structured with a summary section followed by the full row-level data, suitable for opening in Excel or any spreadsheet tool.
+The CSV download is structured with a summary section followed by the full row-level data, suitable for opening in Excel or any spreadsheet tool.
 
 ---
 
@@ -189,7 +190,7 @@ Both formats include the full summary and the day-by-day table. The HTML downloa
 | Zero-amount transactions | Treated as valid no-ops; running balance is unaffected |
 | Unsorted input rows | Both CSVs are sorted chronologically internally; row order in the input files does not matter |
 | Empty CSVs (headers only, no data rows) | Returns a clean empty result with no rows, no mismatches, and no crash |
-| No bank records at all | All transaction dates marked `NO_RECORD`; `net_discrepancy` is `None`; `all_match` remains `True` |
+| No bank records at all | All transaction dates marked `NO_RECORD`; `net_discrepancy` is `None`; `mismatch_count` remains `0` |
 | Floating point accumulation | Discrepancy is rounded to two decimal places at comparison time, absorbing minor float drift |
 | BOM in UTF-8 files (Excel exports) | Handled automatically — files are decoded as `utf-8-sig` |
 
@@ -222,7 +223,9 @@ python -m pytest test_reconcile.py -v
 
 - **The tool is tolerant of imperfect CSV formatting.** Real-world exports from accounting software, banks, and spreadsheets are not always consistent. Column headers may have surrounding whitespace. Amount fields may include currency symbols (`$`, `£`, `€`, etc.), thousands separators (`,`), and mixed formatting. The tool strips all of this before parsing so that files from different sources can be compared without manual cleanup. If an amount cell cannot be reduced to a valid number after cleaning, the row is rejected with an error identifying the offending date and value.
 
-- **Negatives are denoted with a leading minus sign (`-`).** Accounting notation using parentheses for negatives — e.g. `(250.00)` — is not supported. Amounts must use `-250.00` or `-$250.00` format.
+- **Three negative formats are supported.** Leading minus (`-250.00`), accounting parentheses (`(250.00)`), and trailing minus (`250.00-`) are all parsed correctly as negative values. CR/DR suffixes are not supported.
+
+- **Amounts are standard decimal notation.** Scientific notation (e.g. `1e5`) is not expected and will not parse correctly — amounts should appear as `100000.00`.
 
 - **CSV files must have a header row.** A completely empty file (no headers, no data) is rejected. A file with only a header row and no data rows is valid and produces an empty result.
 

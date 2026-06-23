@@ -347,6 +347,127 @@ corrected the test count from 26 to 49. New entries added:
   - Floating point accumulation
 
 
+────────────────────────────────────────────────────────────────────────────────
+USER
+────────────────────────────────────────────────────────────────────────────────
+
+/code-review
+
+
+────────────────────────────────────────────────────────────────────────────────
+ASSISTANT
+────────────────────────────────────────────────────────────────────────────────
+
+Ran a full 8-angle code review. 6 confirmed bugs found and reported:
+
+  1. main.py:39 — row["date"].strip() in _parse_totals was outside the
+     try/except. A wrong-cased header ("Date" vs "date") raised uncaught
+     KeyError → 500 instead of 400.
+
+  2. main.py:54 — Same issue in _parse_bank for row["date"].strip().
+
+  3. main.py:41/58 — row["amount"] and row["balance"] raised KeyError (not
+     ValueError) if the column was missing from the header. The except clause
+     only caught ValueError, so KeyError escaped → 500.
+
+  4. server.py:500 — download_csv nested key accesses (summary["discrepancies"],
+     d["date"], r["running"], etc.) were outside the try/except block. A crafted
+     POST payload missing any nested key raised uncaught KeyError → Flask 500
+     HTML page instead of JSON 400 response.
+
+  5. main.py:27 — _make_reader's fieldnames is None guard didn't catch a blank
+     leading line. CSV "\ndate,amount\n100" gave fieldnames=[''], bypassing the
+     guard. Then row["date"] raised KeyError → 500 with raw error message.
+
+  6. README.md — Still referenced the removed /download/html endpoint (line 18),
+     "Download HTML" button (line 63), HTML download description (line 168), and
+     all_match (line 192, removed from return shape).
+
+
+────────────────────────────────────────────────────────────────────────────────
+USER
+────────────────────────────────────────────────────────────────────────────────
+
+Fix those bugs.
+
+
+────────────────────────────────────────────────────────────────────────────────
+ASSISTANT
+────────────────────────────────────────────────────────────────────────────────
+
+Fixed all 6 bugs:
+
+  1+2. _parse_totals and _parse_bank: wrapped row["date"].strip() in its own
+       try/except (KeyError, AttributeError), raising a clean ValueError.
+
+  3.   Broadened except ValueError to except (ValueError, KeyError) for the
+       amount/balance access in both parsers.
+
+  4.   download_csv: wrapped all nested key accesses in a second try/except
+       KeyError block so malformed payloads return JSON 400 instead of 500.
+
+  5.   _make_reader: added if not any(reader.fieldnames): raise ValueError(...)
+       after stripping whitespace, catching all-blank header rows.
+
+  6.   README: removed /download/html endpoint, "Download HTML" button reference,
+       HTML download description, and replaced all_match with mismatch_count.
+
+  50/50 tests passing.
+
+
+────────────────────────────────────────────────────────────────────────────────
+USER
+────────────────────────────────────────────────────────────────────────────────
+
+Think of all possible edge cases that can break main.py. Does the code cover it?
+
+
+────────────────────────────────────────────────────────────────────────────────
+ASSISTANT
+────────────────────────────────────────────────────────────────────────────────
+
+Swept every input category a bank/statement CSV could produce:
+
+  Amount/balance field:
+    "$1,000.00", "-$250.50", "$-250.50", "1 000.00", "$ 1,000.00",
+    "+250.00", "", "N/A", "PENDING", "1.2.3" — all covered.
+    "(250.00)" (accounting parens) — silently parsed as positive ❌
+    "250.50-" (trailing minus)     — raised ValueError ❌
+
+  Date field:
+    Empty/whitespace → ValueError ✓
+    "N/A" as date → used as literal string key, no crash (low risk)
+
+  CSV structure:
+    No header, blank leading line, wrong column names, short row,
+    extra columns, all-blank data row, duplicate bank dates — all covered.
+
+  Two real gaps identified:
+    1. Accounting parens: (250.00) → silently parsed as +250.00
+    2. Trailing minus: 250.50- → ValueError instead of -250.50
+
+
+────────────────────────────────────────────────────────────────────────────────
+USER
+────────────────────────────────────────────────────────────────────────────────
+
+Fix those gaps.
+
+
+────────────────────────────────────────────────────────────────────────────────
+ASSISTANT
+────────────────────────────────────────────────────────────────────────────────
+
+Added two fixes to clean_number and an empty-date guard to both parsers:
+
+  clean_number: try raw float first (for scientific notation preservation),
+  then apply regex cleanup. Also added empty-date guard: if not date: raise
+  ValueError("date cell is empty") in both _parse_totals and _parse_bank.
+
+  Note: the scientific notation handling was later removed after the user
+  pointed out bank statements never contain scientific notation.
+
+
 ================================================================================
 END OF TRANSCRIPT
 ================================================================================

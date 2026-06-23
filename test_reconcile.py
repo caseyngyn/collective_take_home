@@ -578,10 +578,10 @@ class TestZeroAmountTransactions:
         assert result["rows"][1]["running"] == 1000.0
 
     def test_zero_string_variants(self):
-        from main import clean_number
-        assert clean_number("0") == 0.0
-        assert clean_number("0.00") == 0.0
-        assert clean_number("$0.00") == 0.0
+        from main import _clean_number
+        assert _clean_number("0") == 0.0
+        assert _clean_number("0.00") == 0.0
+        assert _clean_number("$0.00") == 0.0
 
 
 # ── 16. Floating point accumulation ──────────────────────────────────────────

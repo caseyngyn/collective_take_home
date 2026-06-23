@@ -440,20 +440,29 @@ function renderResults(data) {
 }
 
 /* ── Download ── */
-function download() {
+async function download() {
   if (!lastResult) return;
-  const url = '/download/csv';
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.action = url;
-  const inp = document.createElement('input');
-  inp.type = 'hidden';
-  inp.name = 'data';
-  inp.value = JSON.stringify(lastResult);
-  form.appendChild(inp);
-  document.body.appendChild(form);
-  form.submit();
-  document.body.removeChild(form);
+  const fd = new FormData();
+  fd.append('data', JSON.stringify(lastResult));
+  try {
+    const res = await fetch('/download/csv', { method: 'POST', body: fd });
+    if (!res.ok) {
+      const err = await res.json();
+      showError(err.error || 'Download failed');
+      return;
+    }
+    const disposition = res.headers.get('Content-Disposition') || '';
+    const filename = disposition.match(/filename="([^"]+)"/)?.[1] || 'reconciliation.csv';
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    showError(err.message);
+  }
 }
 </script>
 </body>
@@ -491,33 +500,36 @@ def download_csv():
         summary = data["summary"]
     except (KeyError, json.JSONDecodeError) as e:
         return jsonify({"error": f"Invalid download payload: {e}"}), 400
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    buf = io.StringIO()
-    w = csv.writer(buf)
+    try:
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        buf = io.StringIO()
+        w = csv.writer(buf)
 
-    w.writerow(["=== SUMMARY ==="])
-    w.writerow(["Final Running Balance", summary["final_running_balance"]])
-    w.writerow(["Final Bank Balance",    summary["final_bank_balance"]])
-    w.writerow(["Net Discrepancy",       summary["net_discrepancy"]])
-    w.writerow([])
-    if summary["discrepancies"]:
-        w.writerow(["=== DISCREPANCY DATES ==="])
-        w.writerow(["Date", "Discrepancy"])
-        for d in summary["discrepancies"]:
-            w.writerow([d["date"], d["discrepancy"]])
+        w.writerow(["=== SUMMARY ==="])
+        w.writerow(["Final Running Balance", summary["final_running_balance"]])
+        w.writerow(["Final Bank Balance",    summary["final_bank_balance"]])
+        w.writerow(["Net Discrepancy",       summary["net_discrepancy"]])
         w.writerow([])
+        if summary["discrepancies"]:
+            w.writerow(["=== DISCREPANCY DATES ==="])
+            w.writerow(["Date", "Discrepancy"])
+            for d in summary["discrepancies"]:
+                w.writerow([d["date"], d["discrepancy"]])
+            w.writerow([])
 
-    w.writerow(["=== DAY-BY-DAY REPORT ==="])
-    w.writerow(["Date", "Running Balance", "Bank Balance", "Discrepancy", "Status"])
-    for r in rows:
-        w.writerow([
-            r["date"],
-            r["running"],
-            r["bank"] if r["bank"] is not None else "",
-            r["discrepancy"] if r["discrepancy"] is not None else "",
-            r["status"],
-        ])
+        w.writerow(["=== DAY-BY-DAY REPORT ==="])
+        w.writerow(["Date", "Running Balance", "Bank Balance", "Discrepancy", "Status"])
+        for r in rows:
+            w.writerow([
+                r["date"],
+                r["running"],
+                r["bank"] if r["bank"] is not None else "",
+                r["discrepancy"] if r["discrepancy"] is not None else "",
+                r["status"],
+            ])
+    except (KeyError, TypeError) as e:
+        return jsonify({"error": f"Invalid download payload: {e}"}), 400
 
     buf.seek(0)
     return send_file(
