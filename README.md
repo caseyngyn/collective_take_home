@@ -211,7 +211,7 @@ python -m pytest test_reconcile.py -v
 
 ## Assumptions
 
-- **The running balance starts at the provided starting balance, defaulting to zero.** If you are reconciling a partial period, enter the prior-period closing ledger balance in the Starting Balance field before clicking Reconcile. This offsets the running balance by that amount — bank balances are unaffected. If left at 0.00 and your export starts mid-period, the opening mismatch warning will fire and all rows may show a consistent offset.
+- **The running balance starts at the provided starting balance, defaulting to zero.** There may be a prior-period closing ledger balance. This offsets the running balance by that amount — bank balances are unaffected. If left at 0.00 and your export starts mid-period, the opening mismatch warning will fire and all rows may show a consistent offset.
 
 - **Most common date formats are accepted.** Dates are parsed and normalized to `YYYY-MM-DD` automatically using `python-dateutil`. Both files can use different date formats — each date is normalized before matching and sorting. If a date cannot be parsed, the row is rejected with a clear error.
 
