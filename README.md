@@ -123,7 +123,7 @@ Column headers are also whitespace-tolerant — `" date "` and `"date"` are trea
 
 ### Date format
 
-YYYY-MM-DD` is the only format that guarantees correct chronological ordering.
+Dates are automatically parsed and normalized to `YYYY-MM-DD` using `python-dateutil`, so most common formats are accepted (`2024-01-15`, `01/15/2024`, `Jan 15 2024`, etc.). Both files do not need to use the same format — each date is normalized before matching and sorting.
 
 ---
 
@@ -153,7 +153,7 @@ Each row represents one calendar date. Rows are sorted chronologically.
 | Column | Description |
 |--------|-------------|
 | Date | The date |
-| Running Balance | Cumulative sum of all transactions up to and including this date |
+| Running Balance | Starting balance plus cumulative sum of all transactions up to and including this date |
 | Bank Balance | The bank's reported balance on this date (`—` if no bank record exists) |
 | Discrepancy | Running Balance minus Bank Balance (`—` if no bank record) |
 | Status | Match, Mismatch, or No Record (see below) |
@@ -211,11 +211,9 @@ python -m pytest test_reconcile.py -v
 
 ## Assumptions
 
-- **The running balance starts at the provided starting balance, defaulting to zero.** running balance from period priod may be needed. This offsets the running balance by that amount — bank balances are unaffected. If left at 0.00 the opening mismatch warning will fire and all rows may show a consistent offset.
+- **The running balance starts at the provided starting balance, defaulting to zero.** If you are reconciling a partial period, enter the prior-period closing ledger balance in the Starting Balance field before clicking Reconcile. This offsets the running balance by that amount — bank balances are unaffected. If left at 0.00 and your export starts mid-period, the opening mismatch warning will fire and all rows may show a consistent offset.
 
-- **`YYYY-MM-DD` is the only format that guarantees correct chronological ordering.**
-
-- **Date format is the same for both files.** 
+- **Most common date formats are accepted.** Dates are parsed and normalized to `YYYY-MM-DD` automatically using `python-dateutil`. Both files can use different date formats — each date is normalized before matching and sorting. If a date cannot be parsed, the row is rejected with a clear error.
 
 - **Duplicate transaction dates are intentional and valid.** It is normal to have multiple transactions in one day. Duplicate bank dates are treated as a data error because each bank entry represents a single end-of-day snapshot.
 

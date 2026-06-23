@@ -3,6 +3,7 @@ import io
 import re
 from collections import defaultdict
 from typing import Any
+from dateutil import parser as dateutil_parser
 
 
 def _clean_number(value: str) -> float:
@@ -52,6 +53,7 @@ def _parse_totals(tx_text: str) -> defaultdict[str, float]:
             # any real date format contains at least one digit
             if not date or not any(c.isdigit() for c in date):
                 raise ValueError(f"invalid date value: {date!r}")
+            date = dateutil_parser.parse(date).strftime("%Y-%m-%d")
             totals[date] += _clean_number(row["amount"])
         except (ValueError, KeyError, AttributeError) as e:
             # row.get('date') instead of date — date was never assigned if the KeyError was on row["date"]
@@ -72,6 +74,7 @@ def _parse_bank(bank_text: str) -> dict[str, float]:
             # any real date format contains at least one digit
             if not date or not any(c.isdigit() for c in date):
                 raise ValueError(f"invalid date value: {date!r}")
+            date = dateutil_parser.parse(date).strftime("%Y-%m-%d")
             balance = _clean_number(row["balance"])
         except (ValueError, KeyError, AttributeError) as e:
             # row.get('date') instead of date — date was never assigned if the KeyError was on row["date"]
