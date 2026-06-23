@@ -25,6 +25,15 @@ def _clean_number(value: str) -> float:
         raise ValueError(f"Cannot parse amount from value: {value!r}")
 
 
+def _parse_date(raw: str) -> str:
+    # validates and normalizes a raw date cell to YYYY-MM-DD
+    # raises: ValueError for empty or placeholder values (e.g. "N/A", "-")
+    date = raw.strip()
+    if not date or not any(c.isdigit() for c in date):
+        raise ValueError(f"invalid date value: {date!r}")
+    return dateutil_parser.parse(date).strftime("%Y-%m-%d")
+
+
 def _make_reader(text: str) -> csv.DictReader:
     # wraps text in a DictReader and strips whitespace from column headers
     # params: text (str) — full CSV text
@@ -48,12 +57,7 @@ def _parse_totals(tx_text: str) -> defaultdict[str, float]:
     totals: defaultdict[str, float] = defaultdict(float)
     for row in _make_reader(tx_text):
         try:
-            date = row["date"].strip()
-            # rejects placeholders like "N/A", "none", "-" that spreadsheets emit for missing dates —
-            # any real date format contains at least one digit
-            if not date or not any(c.isdigit() for c in date):
-                raise ValueError(f"invalid date value: {date!r}")
-            date = dateutil_parser.parse(date).strftime("%Y-%m-%d")
+            date = _parse_date(row["date"])
             totals[date] += _clean_number(row["amount"])
         except (ValueError, KeyError, AttributeError) as e:
             # row.get('date') instead of date — date was never assigned if the KeyError was on row["date"]
@@ -69,12 +73,7 @@ def _parse_bank(bank_text: str) -> dict[str, float]:
     bank: dict[str, float] = {}
     for row in _make_reader(bank_text):
         try:
-            date = row["date"].strip()
-            # rejects placeholders like "N/A", "none", "-" that spreadsheets emit for missing dates —
-            # any real date format contains at least one digit
-            if not date or not any(c.isdigit() for c in date):
-                raise ValueError(f"invalid date value: {date!r}")
-            date = dateutil_parser.parse(date).strftime("%Y-%m-%d")
+            date = _parse_date(row["date"])
             balance = _clean_number(row["balance"])
         except (ValueError, KeyError, AttributeError) as e:
             # row.get('date') instead of date — date was never assigned if the KeyError was on row["date"]
@@ -132,8 +131,8 @@ def reconcile_data(tx_text: str, bank_text: str, starting_balance: float = 0.0) 
     # both files had headers but no data rows
     if not all_dates:
         return {"rows": [], "mismatch_count": 0, "warning": None,
-                "summary": {"final_running_balance": 0.0, "final_bank_balance": None,
-                             "net_discrepancy": None, "discrepancies": []}}
+                "summary": {"starting_balance": starting_balance, "final_running_balance": starting_balance,
+                             "final_bank_balance": None, "net_discrepancy": None, "discrepancies": []}}
 
     first_date = all_dates[0]
     warning = _opening_warning(first_date, starting_balance + totals.get(first_date, 0.0), bank.get(first_date))
@@ -141,7 +140,7 @@ def reconcile_data(tx_text: str, bank_text: str, starting_balance: float = 0.0) 
     running_balance = starting_balance
     mismatch_count = 0
     open_discrepancy: float | None = None # used by _classify to decide whether a non-zero discrepancy is a continuation
-    last_seen_discrepancy = 0.0 #  what was the discrepancy on the previous date? avoid duplicate entries in discrepancy_log
+    last_seen_discrepancy = 0.0
     final_bank_balance: float | None = None
     rows: list[dict[str, Any]] = []
     discrepancy_log: list[dict[str, Any]] = []
