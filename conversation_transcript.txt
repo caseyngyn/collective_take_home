@@ -501,6 +501,36 @@ pytest out of requirements.txt (dev dependency) and restored `pip install pytest
 in the Running the Tests section of the README.
 
 
+────────────────────────────────────────────────────────────────────────────────
+USER
+────────────────────────────────────────────────────────────────────────────────
+if an accountant worked on this with an engineer would there be anymore concerns?
+Does this handle all the accountant's needs?
+
+
+────────────────────────────────────────────────────────────────────────────────
+ASSISTANT
+────────────────────────────────────────────────────────────────────────────────
+
+
+Functional gaps:
+
+1. No starting balance input — The running balance always starts at zero. In practice, accountants reconcile a specific period (e.g. one month). Without inputting a prior-period closing balance, they'd have to upload every transaction from inception, which isn't realistic.
+2. No concept of outstanding items — Bank reconciliation has a specific concept: checks written but not yet cleared, deposits in transit, etc. The tool shows NO_RECORD but doesn't distinguish "expected to clear" from "unexplained gap."
+3. No way to annotate discrepancies — Accountants document why a discrepancy exists. The tool shows the gap but provides no mechanism to note "bank fee," "timing difference," etc.
+4. Materiality — A $0.01 float rounding difference and a $10,000 error are treated identically. Most accounting tools let you set a threshold below which differences are ignored.
+
+Data concerns:
+
+5. Multi-currency — Currency symbols are stripped but no conversion happens. Mixed-currency transactions (USD + EUR) would be silently added together.
+
+What's solid:
+- Day-by-day discrepancy tracking is exactly what accountants want
+- Summing multiple transactions per day is correct behavior
+- Duplicate bank date rejection is important and handled
+- The opening balance warning is genuinely useful
+
+
 ================================================================================
 END OF TRANSCRIPT
 ================================================================================

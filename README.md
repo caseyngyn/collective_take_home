@@ -55,11 +55,12 @@ The server runs in debug mode on port 5000 by default.
 
 1. **Drop or browse** your `transactions.csv` into the left upload zone.
 2. **Drop or browse** your `bank_balances.csv` into the right upload zone.
-3. The **Reconcile** button activates once both files are loaded — click it.
-4. Results appear immediately below:
+3. If reconciling a partial period, enter your **Starting Balance** — the closing ledger balance from the prior period. Leave it as `0.00` if reconciling from the beginning.
+4. The **Reconcile** button activates once both files are loaded — click it.
+5. Results appear immediately below:
    - A **summary banner** (green = all clear, red = discrepancies found)
    - A **day-by-day table** with color-coded rows
-5. Use **Download CSV** to save a report. The filename is timestamped, e.g. `reconciliation_20260618_143022.csv`.
+6. Use **Download CSV** to save a report. The filename is timestamped, e.g. `reconciliation_20260618_143022.csv`.
 
 You can re-upload different files and click Reconcile again without refreshing — results replace the previous run.
 
@@ -122,7 +123,7 @@ Column headers are also whitespace-tolerant — `" date "` and `"date"` are trea
 
 ### Date format
 
-Dates are compared as strings after stripping whitespace. As long as both files use the same date format consistently, any format works (`2024-01-15`, `01/15/2024`, `Jan 15 2024`, etc.). The tool sorts dates lexicographically, so `YYYY-MM-DD` is strongly recommended for correct ordering.
+YYYY-MM-DD` is the only format that guarantees correct chronological ordering.
 
 ---
 
@@ -134,7 +135,8 @@ Appears at the top of the results.
 
 | Field | Description |
 |-------|-------------|
-| Final Running Balance | Sum of all transaction amounts across all dates |
+| Starting Balance | The prior-period closing balance entered before reconciling (0.00 if not set) |
+| Final Running Balance | Starting balance plus the sum of all transaction amounts across all dates |
 | Final Bank Balance | The bank's balance on the last date that appears in the bank file |
 | Net Discrepancy | Final Running Balance minus Final Bank Balance |
 | Days Reviewed | Total number of distinct dates across both files |
@@ -203,25 +205,27 @@ pip install pytest
 python -m pytest test_reconcile.py -v
 ```
 
-49 tests across 15 scenarios. All test the core reconciliation engine in `main.py` directly, independent of Flask.
+50 tests across 15 scenarios. All test the core reconciliation engine in `main.py` directly, independent of Flask.
 
 ---
 
 ## Assumptions
 
-- **The running balance starts at zero.** There is no concept of a prior-period carried balance. The running balance is built entirely from the transactions provided. If your export starts mid-period, the opening mismatch warning will fire and all rows may show a consistent offset equal to whatever was missing from before the export window.
+- **The running balance starts at the provided starting balance, defaulting to zero.** running balance from period priod may be needed. This offsets the running balance by that amount — bank balances are unaffected. If left at 0.00 the opening mismatch warning will fire and all rows may show a consistent offset.
 
-- **Dates are sorted lexicographically.** The tool does not parse or validate date formats — it compares them as strings and sorts them with Python's default string sort. `YYYY-MM-DD` is the only format that guarantees correct chronological ordering.
+- **`YYYY-MM-DD` is the only format that guarantees correct chronological ordering.**
+
+- **Date format is the same for both files.** 
 
 - **Duplicate transaction dates are intentional and valid.** It is normal to have multiple transactions in one day. Duplicate bank dates are treated as a data error because each bank entry represents a single end-of-day snapshot.
 
-- **A discrepancy that persists unchanged across multiple days counts as one discrepancy event, not one per day.** The mismatch count and discrepancy log record the date a new gap appears or an existing gap changes amount — not every day the gap exists. This keeps the summary focused on where something went wrong, not how long it lingered.
+- **A discrepancy that persists unchanged across multiple days counts as one discrepancy event, not one per day.** The mismatch count and discrepancy log record the date a new gap appears or an existing gap changes amount — not every day the gap exists. 
 
 - **No bank record is not the same as a mismatch.** If a date exists in transactions but not in the bank file, the tool flags it as `NO_RECORD` and skips it for match/mismatch counting. This is intentional — the bank simply may not report a balance every single day (weekends, holidays, etc.).
 
 - **The discrepancy column shows running balance minus bank balance.** A positive discrepancy means the ledger is higher than the bank; a negative discrepancy means the bank is higher than the ledger.
 
-- **The tool is tolerant of imperfect CSV formatting.** Real-world exports from accounting software, banks, and spreadsheets are not always consistent. Column headers may have surrounding whitespace. Amount fields may include currency symbols (`$`, `£`, `€`, etc.), thousands separators (`,`), and mixed formatting. The tool strips all of this before parsing so that files from different sources can be compared without manual cleanup. If an amount cell cannot be reduced to a valid number after cleaning, the row is rejected with an error identifying the offending date and value.
+- **The tool is tolerant of imperfect CSV formatting.** Real-world exports from accounting software, banks, and spreadsheets are not always consistent. Column headers may have surrounding whitespace. Amount fields may include currency symbols (`$`, `£`, `€`, etc.)[tool currrently does not handle conversion however], thousands separators (`,`), and mixed formatting. The tool strips all of this before parsing so that files from different sources can be compared without manual cleanup. If an amount cell cannot be reduced to a valid number after cleaning, the row is rejected with an error identifying the offending date and value.
 
 - **CSV files must have a header row.** A completely empty file (no headers, no data) is rejected. A file with only a header row and no data rows is valid and produces an empty result.
 

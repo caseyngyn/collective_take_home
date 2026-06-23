@@ -116,7 +116,7 @@ def _classify(
     return "MISMATCH", discrepancy, mismatch_count + 1
 
 # main logic
-def reconcile_data(tx_text: str, bank_text: str) -> dict[str, Any]:
+def reconcile_data(tx_text: str, bank_text: str, starting_balance: float = 0.0) -> dict[str, Any]:
     # guard against callers passing bytes or None (Flask file.read() returns bytes if not decoded)
     if not isinstance(tx_text, str) or not isinstance(bank_text, str):
         raise TypeError("tx_text and bank_text must be strings")
@@ -133,9 +133,9 @@ def reconcile_data(tx_text: str, bank_text: str) -> dict[str, Any]:
                              "net_discrepancy": None, "discrepancies": []}}
 
     first_date = all_dates[0]
-    warning = _opening_warning(first_date, totals.get(first_date, 0.0), bank.get(first_date))
+    warning = _opening_warning(first_date, starting_balance + totals.get(first_date, 0.0), bank.get(first_date))
 
-    running_balance = 0.0
+    running_balance = starting_balance
     mismatch_count = 0
     open_discrepancy: float | None = None # used by _classify to decide whether a non-zero discrepancy is a continuation
     last_seen_discrepancy = 0.0 #  what was the discrepancy on the previous date? avoid duplicate entries in discrepancy_log
@@ -172,6 +172,7 @@ def reconcile_data(tx_text: str, bank_text: str) -> dict[str, Any]:
         "mismatch_count": mismatch_count,
         "warning": warning,
         "summary": {
+            "starting_balance": starting_balance,
             "final_running_balance": running_balance,
             "final_bank_balance": final_bank_balance,
             "net_discrepancy": net_discrepancy,

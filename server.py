@@ -236,6 +236,17 @@ HTML = r"""
       </div>
     </div>
 
+    <div style="margin-bottom:16px;">
+      <label style="font-size:.85rem;font-weight:600;color:#374151;display:block;margin-bottom:6px;">
+        Starting Balance
+      </label>
+      <input type="number" id="startingBalance" value="0.00" step="0.01"
+             style="width:180px;padding:8px 12px;border:1.5px solid #c9d0e0;border-radius:8px;font-size:.9rem;"/>
+      <div style="font-size:.75rem;color:#9ca3af;margin-top:5px;">
+        The prior-period closing balance from your ledger. Applied to the running balance only — bank balances are unaffected.
+      </div>
+    </div>
+
     <div class="btn-row">
       <button class="btn btn-primary" id="btnReconcile" onclick="reconcile()" disabled>
         <span id="btnIcon">⚡</span>
@@ -330,6 +341,7 @@ async function reconcile() {
   const fd = new FormData();
   fd.append('transactions', txFile);
   fd.append('bank_balances', bkFile);
+  fd.append('starting_balance', document.getElementById('startingBalance').value || '0');
 
   try {
     const res = await fetch('/reconcile', { method: 'POST', body: fd });
@@ -484,7 +496,8 @@ def reconcile():
     try:
         tx_text = tx_file.read().decode("utf-8-sig")
         bk_text = bk_file.read().decode("utf-8-sig")
-        result = reconcile_data(tx_text, bk_text)
+        starting_balance = float(request.form.get("starting_balance", 0) or 0)
+        result = reconcile_data(tx_text, bk_text, starting_balance)
         return jsonify(result)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -507,6 +520,7 @@ def download_csv():
         w = csv.writer(buf)
 
         w.writerow(["=== SUMMARY ==="])
+        w.writerow(["Starting Balance",      summary["starting_balance"]])
         w.writerow(["Final Running Balance", summary["final_running_balance"]])
         w.writerow(["Final Bank Balance",    summary["final_bank_balance"]])
         w.writerow(["Net Discrepancy",       summary["net_discrepancy"]])
