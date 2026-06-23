@@ -12,12 +12,12 @@ The tool has three layers:
 Reads both CSVs, sums all transaction amounts per date into a running balance, then compares that running balance against the bank's reported balance for each date. It returns a structured result containing a row for every date, a summary, and a list of the specific dates where discrepancies first appeared or changed.
 
 **`server.py` — Flask backend**
-Serves the single-page UI and exposes three endpoints:
+Serves the single-page UI and exposes two endpoints:
 - `POST /reconcile` — accepts the two uploaded files, runs the engine, returns JSON
 - `POST /download/csv` — renders the result as a downloadable CSV report
 
 **HTML/JS frontend (embedded in `server.py`)**
-All UI lives in a single HTML string served by Flask. No build step, no external dependencies. The browser sends files to `/reconcile`, receives JSON, and renders the results client-side. Downloads trigger a form POST so the browser handles the file save natively.
+All UI lives in a single HTML string served by Flask. No build step, no external dependencies. The browser sends files to `/reconcile`, receives JSON, and renders the results client-side. Downloads use a `fetch` request — errors are shown in-app rather than losing the current results.
 
 ---
 
@@ -25,10 +25,10 @@ All UI lives in a single HTML string served by Flask. No build step, no external
 
 **Requirements:** Python 3.8+, Flask
 
-Install Flask if you don't already have it:
+Install dependencies:
 
 ```bash
-pip install flask
+pip install -r requirements.txt
 ```
 
 No other packages are required. The reconciliation engine (`main.py`) uses only the Python standard library.
@@ -222,10 +222,6 @@ python -m pytest test_reconcile.py -v
 - **The discrepancy column shows running balance minus bank balance.** A positive discrepancy means the ledger is higher than the bank; a negative discrepancy means the bank is higher than the ledger.
 
 - **The tool is tolerant of imperfect CSV formatting.** Real-world exports from accounting software, banks, and spreadsheets are not always consistent. Column headers may have surrounding whitespace. Amount fields may include currency symbols (`$`, `£`, `€`, etc.), thousands separators (`,`), and mixed formatting. The tool strips all of this before parsing so that files from different sources can be compared without manual cleanup. If an amount cell cannot be reduced to a valid number after cleaning, the row is rejected with an error identifying the offending date and value.
-
-- **Three negative formats are supported.** Leading minus (`-250.00`), accounting parentheses (`(250.00)`), and trailing minus (`250.00-`) are all parsed correctly as negative values. CR/DR suffixes are not supported.
-
-- **Amounts are standard decimal notation.** Scientific notation (e.g. `1e5`) is not expected and will not parse correctly — amounts should appear as `100000.00`.
 
 - **CSV files must have a header row.** A completely empty file (no headers, no data) is rejected. A file with only a header row and no data rows is valid and produces an empty result.
 

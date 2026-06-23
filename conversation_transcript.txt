@@ -467,6 +467,39 @@ Added two fixes to clean_number and an empty-date guard to both parsers:
   Note: the scientific notation handling was later removed after the user
   pointed out bank statements never contain scientific notation.
 
+────────────────────────────────────────────────────────────────────────────────
+USER
+────────────────────────────────────────────────────────────────────────────────
+
+/code-review
+
+
+────────────────────────────────────────────────────────────────────────────────
+ASSISTANT
+────────────────────────────────────────────────────────────────────────────────
+
+Ran second full 8-angle code review. No new bugs found in main.py. One issue
+found in server.py: the download endpoint's nested key accesses on the JSON
+payload were outside a try/except, so a malformed payload raised uncaught
+KeyError → 500. Fixed by wrapping in try/except (KeyError, TypeError).
+
+
+────────────────────────────────────────────────────────────────────────────────
+USER
+────────────────────────────────────────────────────────────────────────────────
+
+add a requirements.txt.
+
+
+────────────────────────────────────────────────────────────────────────────────
+ASSISTANT
+────────────────────────────────────────────────────────────────────────────────
+
+Created requirements.txt with flask==3.1.3. Updated README setup section to
+use `pip install -r requirements.txt` instead of `pip install flask`. Moved
+pytest out of requirements.txt (dev dependency) and restored `pip install pytest`
+in the Running the Tests section of the README.
+
 
 ================================================================================
 END OF TRANSCRIPT
