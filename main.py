@@ -7,10 +7,12 @@ from dateutil import parser as dateutil_parser
 
 
 def _clean_number(value: str) -> float:
-    # strips whitespace, currency symbols ($£€¥₹₩₪ etc), and commas from formatted numbers
-    # supports: leading minus (-250.00), accounting parens ((250.00)), trailing minus (250.00-)
-    # params: value (str) — raw cell value from CSV
-    # returns: float
+    """
+    strips whitespace, currency symbols ($£€¥₹₩₪ etc), and commas from formatted numbers
+    supports: leading minus (-250.00), accounting parens ((250.00)), trailing minus (250.00-)
+    params: value (str) — raw cell value from CSV
+    returns: float
+    """
     stripped = value.strip()
     # edge case: accounting parens mean negative: (250.00) → -250.00
     if stripped.startswith('(') and stripped.endswith(')'):
@@ -26,8 +28,10 @@ def _clean_number(value: str) -> float:
 
 
 def _parse_date(raw: str) -> str:
-    # validates and normalizes a raw date cell to YYYY-MM-DD
-    # raises: ValueError for empty or placeholder values (e.g. "N/A", "-")
+    """
+    validates and normalizes a raw date cell to YYYY-MM-DD
+    raises: ValueError for empty or placeholder values (e.g. "N/A", "-")
+    """
     date = raw.strip()
     if not date or not any(c.isdigit() for c in date):
         raise ValueError(f"invalid date value: {date!r}")
@@ -35,10 +39,12 @@ def _parse_date(raw: str) -> str:
 
 
 def _make_reader(text: str) -> csv.DictReader:
-    # wraps text in a DictReader and strips whitespace from column headers
-    # params: text (str) — full CSV text
-    # returns: csv.DictReader ready to iterate
-    # raises: ValueError if the CSV has no header row
+    """
+    wraps text in a DictReader and strips whitespace from column headers
+    params: text (str) — full CSV text
+    returns: csv.DictReader ready to iterate
+    raises: ValueError if the CSV has no header row
+    """
     reader = csv.DictReader(io.StringIO(text))
     # user uploaded empty file
     if reader.fieldnames is None:
@@ -51,32 +57,34 @@ def _make_reader(text: str) -> csv.DictReader:
 
 
 def _parse_totals(tx_text: str) -> defaultdict[str, float]:
-    # sums transaction amounts per date from a transactions CSV string
-    # params: tx_text (str) — full CSV text with 'date' and 'amount' columns
-    # returns: defaultdict(float) keyed by date string, value is net amount for that date
+    """
+    sums transaction amounts per date from a transactions CSV string
+    params: tx_text (str) — full CSV text with 'date' and 'amount' columns
+    returns: defaultdict(float) keyed by date string, value is net amount for that date
+    """
     totals: defaultdict[str, float] = defaultdict(float)
     for row in _make_reader(tx_text):
         try:
             date = _parse_date(row["date"])
             totals[date] += _clean_number(row["amount"])
         except (ValueError, KeyError, AttributeError) as e:
-            # row.get('date') instead of date — date was never assigned if the KeyError was on row["date"]
             raise ValueError(f"Row {(row.get('date') or '').strip() or 'unknown'}: {e}") from e
     return totals
 
 
 def _parse_bank(bank_text: str) -> dict[str, float]:
-    # parses bank balance snapshots from a bank balances CSV string
-    # params: bank_text (str) — full CSV text with 'date' and 'balance' columns
-    # returns: dict keyed by date string, value is the bank balance for that date
-    # raises: ValueError if the same date appears more than once
+    """
+    parses bank balance snapshots from a bank balances CSV string
+    params: bank_text (str) — full CSV text with 'date' and 'balance' columns
+    returns: dict keyed by date string, value is the bank balance for that date
+    raises: ValueError if the same date appears more than once
+    """
     bank: dict[str, float] = {}
     for row in _make_reader(bank_text):
         try:
             date = _parse_date(row["date"])
             balance = _clean_number(row["balance"])
         except (ValueError, KeyError, AttributeError) as e:
-            # row.get('date') instead of date — date was never assigned if the KeyError was on row["date"]
             raise ValueError(f"Row {(row.get('date') or '').strip() or 'unknown'}: {e}") from e
         if date in bank:
             raise ValueError(f"Duplicate date in bank balances: {date}")
@@ -85,11 +93,13 @@ def _parse_bank(bank_text: str) -> dict[str, float]:
 
 
 def _opening_warning(first_date: str, opening_tx: float, opening_bank: float | None) -> str | None:
-    # checks whether the first date's transaction total matches the bank's opening balance
-    # params: first_date (str) — earliest date across both inputs
-    #         opening_tx (float) — sum of transactions on that date
-    #         opening_bank (float | None) — bank balance on that date, or None if absent
-    # returns: str warning message if there is a mismatch, None otherwise
+    """
+    checks whether the first date's transaction total matches the bank's opening balance
+    params: first_date (str) — earliest date across both inputs
+            opening_tx (float) — sum of transactions on that date
+            opening_bank (float | None) — bank balance on that date, or None if absent
+    returns: str warning message if there is a mismatch, None otherwise
+    """
     if opening_bank is not None and round(opening_tx - opening_bank, 2) != 0:
         return (
             f"Opening balance mismatch on {first_date}: "
@@ -99,17 +109,19 @@ def _opening_warning(first_date: str, opening_tx: float, opening_bank: float | N
     return None
 
 
-def _classify(
+def _evaluate_discrepancy(
     discrepancy: float,
     open_discrepancy: float | None,
     mismatch_count: int,
 ) -> tuple[str, float | None, int]:
-    # determines the status for a single date and updates mismatch tracking state
-    # params: discrepancy (float) — running balance minus bank balance for this date
-    #         open_discrepancy (float | None) — the active gap amount from prior dates;
-    #                                           None means the last comparison was clean
-    #         mismatch_count (int) — running count of distinct discrepancy events so far
-    # returns: tuple of (status (str), new_open_discrepancy (float | None), new_mismatch_count (int))
+    """
+    determines the status for a single date and updates mismatch tracking state
+    params: discrepancy (float) — running balance minus bank balance for this date
+            open_discrepancy (float | None) — the active gap amount from prior dates;
+                                              None means the last comparison was clean
+            mismatch_count (int) — running count of distinct discrepancy events so far
+    returns: tuple of (status (str), new_open_discrepancy (float | None), new_mismatch_count (int))
+    """
     if discrepancy == 0:
         return "OK", None, mismatch_count
     # same gap as the prior date — continuation, not a new event, so mismatch_count stays unchanged
@@ -139,7 +151,7 @@ def reconcile_data(tx_text: str, bank_text: str, starting_balance: float = 0.0) 
 
     running_balance = starting_balance
     mismatch_count = 0
-    open_discrepancy: float | None = None # used by _classify to decide whether a non-zero discrepancy is a continuation
+    open_discrepancy: float | None = None # used by _evaluate_discrepancy to decide whether a non-zero discrepancy is a continuation
     last_seen_discrepancy = 0.0
     final_bank_balance: float | None = None
     rows: list[dict[str, Any]] = []
@@ -164,7 +176,7 @@ def reconcile_data(tx_text: str, bank_text: str, starting_balance: float = 0.0) 
             discrepancy_log.append({"date": d, "discrepancy": discrepancy})
         last_seen_discrepancy = discrepancy
 
-        status, open_discrepancy, mismatch_count = _classify(discrepancy, open_discrepancy, mismatch_count)
+        status, open_discrepancy, mismatch_count = _evaluate_discrepancy(discrepancy, open_discrepancy, mismatch_count)
         rows.append({"date": d, "running": running_balance, "bank": bank_balance, "status": status, "discrepancy": discrepancy})
 
     net_discrepancy = round(running_balance - final_bank_balance, 2) if final_bank_balance is not None else None

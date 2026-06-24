@@ -608,3 +608,80 @@ class TestFloatingPointAccumulation:
         assert result["rows"][0]["discrepancy"] == 0.0
         assert result["rows"][1]["discrepancy"] == 0.0
         assert result["rows"][2]["discrepancy"] == 0.0
+
+
+# ── 17. Complex discrepancy scenario ─────────────────────────────────────────
+
+class TestComplexDiscrepancy:
+    """
+    Realistic month-end reconciliation:
+      Jan 01 — opening deposit $5,000                        → running $5,000  OK
+      Jan 05 — payroll debit -$2,000                         → running $3,000  OK
+      Jan 10 — two revenue credits $500 + $300               → running $3,800  OK
+      Jan 12 — bank fee $25 (bank-only, no ledger entry)     → running $3,800  MISMATCH +25
+      Jan 15 — client payment $1,000                         → running $4,800  MISMATCH +25 (same gap)
+      Jan 18 — correction entry $25 (fee now booked)         → running $4,825  OK (gap resolved)
+      Jan 20 — supplier payment -$400                        → running $4,425  OK
+      Jan 25 — two expenses -$150 and -$100 (one misbooked)  → running $4,175  MISMATCH +175
+      Jan 31 — bank-only month-end snapshot                  → running $4,175  MISMATCH +175 (same gap)
+
+    Expected: mismatch_count=2, two discrepancy log entries (+25 then +175),
+              net_discrepancy=+175 at month end.
+    """
+
+    T = tx(
+        ("2024-01-01", "5000"),
+        ("2024-01-05", "-2000"),
+        ("2024-01-10", "500"),
+        ("2024-01-10", "300"),
+        ("2024-01-15", "1000"),
+        ("2024-01-18", "25"),
+        ("2024-01-20", "-400"),
+        ("2024-01-25", "-150"),
+        ("2024-01-25", "-100"),
+    )
+    B = bk(
+        ("2024-01-01", "5000"),
+        ("2024-01-05", "3000"),
+        ("2024-01-10", "3800"),
+        ("2024-01-12", "3775"),   # bank fee of $25 not in ledger → gap opens
+        ("2024-01-15", "4775"),   # gap persists: running=4800, bank=4775
+        ("2024-01-18", "4825"),   # correction booked → gap closes
+        ("2024-01-20", "4425"),
+        ("2024-01-25", "4000"),   # misbooked expense: running=4175, bank=4000
+        ("2024-01-31", "4000"),   # month-end snapshot, gap still open
+    )
+
+    def test_row_count(self):
+        result = reconcile_data(self.T, self.B)
+        assert len(result["rows"]) == 9
+
+    def test_status_sequence(self):
+        result = reconcile_data(self.T, self.B)
+        assert statuses(result) == [
+            "OK", "OK", "OK",
+            "MISMATCH", "MISMATCH",
+            "OK", "OK",
+            "MISMATCH", "MISMATCH",
+        ]
+
+    def test_two_distinct_mismatch_events(self):
+        result = reconcile_data(self.T, self.B)
+        assert result["mismatch_count"] == 2
+
+    def test_discrepancy_log_values(self):
+        result = reconcile_data(self.T, self.B)
+        log = result["summary"]["discrepancies"]
+        assert len(log) == 2
+        assert log[0]["discrepancy"] == 25.0
+        assert log[1]["discrepancy"] == 175.0
+
+    def test_gap_resolves_on_jan18(self):
+        result = reconcile_data(self.T, self.B)
+        jan18 = next(r for r in result["rows"] if r["date"] == "2024-01-18")
+        assert jan18["status"] == "OK"
+        assert jan18["discrepancy"] == 0.0
+
+    def test_net_discrepancy_at_month_end(self):
+        result = reconcile_data(self.T, self.B)
+        assert result["summary"]["net_discrepancy"] == 175.0
